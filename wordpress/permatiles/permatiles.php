@@ -97,3 +97,25 @@ register_activation_hook(__FILE__, function () {
     flush_rewrite_rules();
 });
 register_deactivation_hook(__FILE__, 'flush_rewrite_rules');
+
+add_action('admin_post_permatiles_pull', function () {
+    if (! current_user_can('manage_options') || ! check_admin_referer('permatiles_pull')) {
+        wp_die('forbidden');
+    }
+    $s = permatiles_settings();
+    $updater = new Permatiles_Updater($s['repo'], PERMATILES_DATA_DIR);
+    wp_mkdir_p(PERMATILES_DATA_DIR);
+    $r = $updater->pull();
+    set_transient('permatiles_last_pull', $r, 600);
+    wp_safe_redirect(admin_url('options-general.php?page=permatiles&pulled=' . ($r['ok'] ? '1' : '0')));
+    exit;
+});
+
+if (defined('WP_CLI') && WP_CLI) {
+    WP_CLI::add_command('permatiles pull', function () {
+        $s = permatiles_settings();
+        wp_mkdir_p(PERMATILES_DATA_DIR);
+        $r = (new Permatiles_Updater($s['repo'], PERMATILES_DATA_DIR))->pull();
+        if ($r['ok']) { WP_CLI::success($r['message']); } else { WP_CLI::error($r['message']); }
+    });
+}
