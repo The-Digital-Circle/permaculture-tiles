@@ -15,11 +15,14 @@ paper_cells = 16
 paper_octaves = 4
 ocean_cells = 8
 ocean_octaves = 3
+ocean_contrast = 0.4
 
+# Palette sampled from the perma.earth footer watercolour (uploads/2022/06/ILUSTRA-12-HOME.jpg):
+# warm cream-tan earth, soft teal water, deep navy pooled coast edge, cream paper.
 [palette]
-land     = "#cdbfa3"
-ocean    = "#a9c7d0"
-lake     = "#b7d2d8"
-river    = "#9fbfc9"
-wet_edge = "#6e8a93"
-paper    = "#e8e0d0"
+land     = "#ead9ba"
+ocean    = "#86c2ba"
+lake     = "#a7d2c9"
+river    = "#93c6bf"
+wet_edge = "#15495f"
+paper    = "#f5e5ce"

@@ -12,9 +12,15 @@ def load_config(path: str) -> dict:
         return tomllib.load(f)
 
 def build_textures(cfg: dict) -> dict:
+    # Ocean is a single 256px tile reused everywhere, so its contrast is compressed toward the mean
+    # (ocean_contrast < 1) to keep the unavoidable tile repetition too subtle to read as a pattern,
+    # while staying perfectly seamless.
+    ocean = fractal_noise(256, cfg["ocean_cells"], cfg["ocean_octaves"], cfg["seed"] + 100)
+    k = cfg.get("ocean_contrast", 1.0)
+    ocean = 0.5 + (ocean - 0.5) * k
     return {
         "paper": fractal_noise(cfg["paper_tex_size"], cfg["paper_cells"], cfg["paper_octaves"], cfg["seed"]),
-        "ocean": fractal_noise(256, cfg["ocean_cells"], cfg["ocean_octaves"], cfg["seed"] + 100),
+        "ocean": ocean,
     }
 
 def cmd_render(cfg: dict):
