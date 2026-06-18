@@ -130,6 +130,8 @@ if (is_admin()) {
  * past our native maxzoom (maxNativeZoom), so soft watercolour stays painterly when zoomed in.
  */
 add_filter('murmfed_base_tilelayer', function ($default) {
+    // An explicit admin "Base map tiles" setting wins; only auto-supply when nothing is configured.
+    if (is_array($default) && ! empty($default['url'])) { return $default; }
     $s = permatiles_settings();
     if (empty($s['enabled'])) { return $default; }
     $manifest = new Permatiles_Manifest(PERMATILES_DATA_DIR);
