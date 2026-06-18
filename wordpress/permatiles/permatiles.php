@@ -123,3 +123,21 @@ if (defined('WP_CLI') && WP_CLI) {
 if (is_admin()) {
     (new Permatiles_Admin())->hooks();
 }
+
+/**
+ * Feed the watercolour basemap to the federation map's filterable base layer. Only when enabled and
+ * tiles are installed; otherwise the federation map falls back to OpenStreetMap. The client overzooms
+ * past our native maxzoom (maxNativeZoom), so soft watercolour stays painterly when zoomed in.
+ */
+add_filter('murmfed_base_tilelayer', function ($default) {
+    $s = permatiles_settings();
+    if (empty($s['enabled'])) { return $default; }
+    $manifest = new Permatiles_Manifest(PERMATILES_DATA_DIR);
+    if (! $manifest->exists()) { return $default; }
+    return [
+        'url'           => home_url('/permatiles/{z}/{x}/{y}.png'),
+        'maxNativeZoom' => (int) $manifest->maxzoom(),
+        'maxZoom'       => 19,
+        'attribution'   => $manifest->attribution() ?: 'Natural Earth',
+    ];
+});
