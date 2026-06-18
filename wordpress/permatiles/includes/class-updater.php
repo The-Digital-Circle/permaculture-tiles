@@ -73,7 +73,9 @@ class Permatiles_Updater {
     }
 
     private function download($url, $path) {
-        $tmp = download_url($url, 60);   // wp_remote handles redirects to the asset CDN
+        // Generous timeout — the tiles archive is a few hundred MB; download_url streams to a temp
+        // file, so this is bounded by bandwidth, not memory.
+        $tmp = download_url($url, 600);  // wp_remote handles redirects to the asset CDN
         if (is_wp_error($tmp)) { return false; }
         $ok = @rename($tmp, $path);
         if (! $ok) { @copy($tmp, $path); @unlink($tmp); $ok = file_exists($path); }
