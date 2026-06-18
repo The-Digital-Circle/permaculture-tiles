@@ -1,0 +1,10 @@
+{
+  "tiles": [
+    { "file": "tiles-z0-6.pmtiles", "minzoom": 0, "maxzoom": 6, "xrange": null },
+    { "file": "tiles-z7-8.pmtiles", "minzoom": 7, "maxzoom": 8, "xrange": null }
+  ],
+  "ocean_tile": "ocean.png",
+  "tile_size": 256,
+  "maxzoom": 8,
+  "attribution": "Natural Earth"
+}
