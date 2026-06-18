@@ -119,3 +119,7 @@ if (defined('WP_CLI') && WP_CLI) {
         if ($r['ok']) { WP_CLI::success($r['message']); } else { WP_CLI::error($r['message']); }
     });
 }
+
+if (is_admin()) {
+    (new Permatiles_Admin())->hooks();
+}
