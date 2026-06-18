@@ -1,1 +1,1 @@
-{"version":1,"defects":[],"times":{"SmokeTest::test_classes_load":0.001}}
+{"version":1,"defects":{"ReaderTest::test_zxy_to_tileid_matches_reference":4,"ReaderTest::test_header_parsed":4,"ReaderTest::test_get_existing_tiles":4,"ReaderTest::test_missing_tile_returns_null":4},"times":{"SmokeTest::test_classes_load":0.001,"ReaderTest::test_zxy_to_tileid_matches_reference":0.001,"ReaderTest::test_header_parsed":0,"ReaderTest::test_get_existing_tiles":0,"ReaderTest::test_missing_tile_returns_null":0}}
