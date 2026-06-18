@@ -28,9 +28,13 @@ def cmd_render(cfg: dict):
     tex = build_textures(cfg)
     pal = Palette.from_dict(cfg["palette"])
     os.makedirs(cfg["out_dir"], exist_ok=True)
+    workers = cfg.get("workers", 1)
     for z in range(cfg["zoom_min"], cfg["zoom_max"] + 1):
-        print(tiles.render_zoom(z, gd, tex, pal, cfg["out_dir"], cfg["pad"], cfg["tile_size"],
-                                workers=cfg.get("workers", 1)))
+        if workers > 1 and z >= 4:
+            print(tiles.render_zoom_parallel(z, gd, tex, pal, cfg["out_dir"], cfg["pad"],
+                                             cfg["tile_size"], workers))
+        else:
+            print(tiles.render_zoom(z, gd, tex, pal, cfg["out_dir"], cfg["pad"], cfg["tile_size"]))
     with open(os.path.join(cfg["out_dir"], "ocean.png"), "wb") as f:
         f.write(to_png8(shared_ocean_tile(pal, tex, cfg["pad"], cfg["tile_size"])))
 

@@ -1,4 +1,5 @@
 import os
+from concurrent.futures import ProcessPoolExecutor
 from . import geo
 from .masks import rasterise, clip_geoms
 from .watercolour import render_padded
@@ -38,6 +39,36 @@ def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bb
                 pruned += 1
                 continue
             d = os.path.join(out_dir, str(z), str(x))
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, f"{y}.png"), "wb") as f:
+                f.write(png)
+            written += 1
+    return {"zoom": z, "written": written, "pruned": pruned}
+
+# --- parallel rendering (process pool); workers share geodata/textures via the initializer ---
+_CTX = {}
+
+def _init_worker(geodata, textures, palette, pad, size):
+    _CTX.update(geodata=geodata, textures=textures, palette=palette, pad=pad, size=size)
+
+def _render_one(args):
+    z, x, y = args
+    png = render_tile(z, x, y, _CTX["geodata"], _CTX["textures"], _CTX["palette"],
+                      _CTX["pad"], _CTX["size"])
+    return (z, x, y, png)
+
+def render_zoom_parallel(z, geodata, textures, palette, out_dir, pad, size, workers):
+    """Same as render_zoom but fans tiles across a process pool. Used for the big zooms (z>=4)."""
+    n = geo.num_tiles(z)
+    jobs = [(z, x, y) for x in range(n) for y in range(n)]
+    written = pruned = 0
+    with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
+                             initargs=(geodata, textures, palette, pad, size)) as ex:
+        for z_, x, y, png in ex.map(_render_one, jobs, chunksize=16):
+            if png is None:
+                pruned += 1
+                continue
+            d = os.path.join(out_dir, str(z_), str(x))
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, f"{y}.png"), "wb") as f:
                 f.write(png)

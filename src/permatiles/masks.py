@@ -19,7 +19,15 @@ def rasterise(geoms, bounds, width, height) -> np.ndarray:
     return arr.astype(bool)
 
 def clip_geoms(gdf, bounds):
-    """Geometries of a (3857) GeoDataFrame that intersect bounds."""
+    """Geometries of a (3857) GeoDataFrame that intersect bounds.
+
+    Uses the R-tree spatial index so the common case at high zoom — a tile with no nearby coastline,
+    i.e. open ocean — returns an empty list in microseconds instead of scanning every polygon. This
+    is what makes the ~65k z8 tiles (mostly pruned ocean) tractable."""
     minx, miny, maxx, maxy = bounds
-    sub = gdf[gdf.intersects(box(minx, miny, maxx, maxy))]
-    return list(sub.geometry)
+    b = box(minx, miny, maxx, maxy)
+    try:
+        idx = gdf.sindex.query(b, predicate="intersects")
+        return list(gdf.geometry.iloc[idx])
+    except Exception:
+        return list(gdf[gdf.intersects(b)].geometry)
