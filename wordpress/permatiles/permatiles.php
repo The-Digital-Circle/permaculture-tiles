@@ -47,6 +47,13 @@ add_filter('query_vars', function ($vars) {
     return array_merge($vars, ['permatiles_z', 'permatiles_x', 'permatiles_y']);
 });
 
+// Without this, WordPress canonical-redirects (301) the tile URL to a trailing-slashed variant
+// (/.../2.png -> /.../2.png/), which Leaflet won't follow — so tiles silently fail to load.
+add_filter('redirect_canonical', function ($redirect_url) {
+    $z = get_query_var('permatiles_z', null);
+    return ($z === null || $z === '') ? $redirect_url : false;
+});
+
 add_action('template_redirect', function () {
     $z = get_query_var('permatiles_z', null);
     if ($z === null || $z === '') { return; }
