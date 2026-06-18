@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/permatiles/__init__.py
+src/permatiles.egg-info/PKG-INFO
+src/permatiles.egg-info/SOURCES.txt
+src/permatiles.egg-info/dependency_links.txt
+src/permatiles.egg-info/requires.txt
+src/permatiles.egg-info/top_level.txt
+tests/test_smoke.py

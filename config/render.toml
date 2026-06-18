@@ -1,0 +1,25 @@
+seed = 7
+zoom_min = 0
+zoom_max = 8
+tile_size = 256
+pad = 24
+workers = 10
+data_dir = "data"
+out_dir = "build/tiles"
+scratch_dir = "build/scratch"
+pmtiles_cap = 1900000000
+attribution = "Natural Earth"
+
+paper_tex_size = 1024
+paper_cells = 16
+paper_octaves = 4
+ocean_cells = 8
+ocean_octaves = 3
+
+[palette]
+land     = "#cdbfa3"
+ocean    = "#a9c7d0"
+lake     = "#b7d2d8"
+river    = "#9fbfc9"
+wet_edge = "#6e8a93"
+paper    = "#e8e0d0"
