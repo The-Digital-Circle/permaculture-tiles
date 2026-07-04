@@ -14,9 +14,11 @@ def test_is_pure_ocean():
     assert not is_pure_ocean({"land": land, "lake": z, "river": z})
 
 def test_shared_ocean_tile_self_tiles():
-    t = {"paper": textures.fractal_noise(1024, 16, 4, 7),
-         "ocean": textures.fractal_noise(256, 8, 3, 107),
-         "granulation": textures.granulation(512, 5),
+    t = {"land_density": textures.brush_density(512, 40),
+         "sea_density": textures.brush_density(256, 100, base=0.90, span=0.08,
+                                               tooth_amp=0.14, floor=0.60, strokes=0.35),
+         "land_grain": textures.paper_grain(512, 200),
+         "sea_grain": textures.paper_grain(256, 210),
          "disp_x": textures.fractal_noise(512, 8, 4, 991),
          "disp_y": textures.fractal_noise(512, 8, 4, 613),
          "speckle": textures.fractal_noise(256, 64, 1, 300)}

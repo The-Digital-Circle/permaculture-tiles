@@ -10,37 +10,52 @@ scratch_dir = "build/scratch"
 pmtiles_cap = 1900000000
 attribution = "Natural Earth"
 
-paper_tex_size = 512
-paper_cells = 32
-paper_octaves = 5
-ocean_cells = 8
-ocean_octaves = 3
-ocean_contrast = 0.4
+# Pigment-density fields (textures.brush_density). 'land_density' is world-continuous at this size,
+# so land brushwork varies across the map; larger = less visible repeat, slower to generate.
+paper_tex_size = 1024
+land_base = 0.88        # mostly pigment -> fresh saturated green (less cream showing through -> less olive)
+land_span = 0.13        # tonal amplitude of the land wash (subtle directional streaks, like the footer)
+tooth_amp = 0.30        # crisp paper-tooth flecks in the wash (lighter specks where paper shows)
+land_floor = 0.60
+land_bloom = 0.15       # weight of isotropic blooms vs directional streaks (low -> streaky, not smudgy)
+land_angle_lo = 0.2     # brush-stroke direction range (radians); narrow -> aligned brushwork
+land_angle_hi = 1.0
+# The sea is ONE shared 256px wash: kept nearly flat (no strokes/blooms, only fine tooth + granulation)
+# so its per-tile repeat across open ocean never reads as a grid.
+sea_base = 0.90
+sea_span = 0.06
+sea_tooth_amp = 0.14
+sea_floor = 0.60
+sea_strokes = 0.0
+sea_bloom = 0.0
 
 [render]
-coast_sigma = 0.9
-disp_amp = 0.55
-edge_px = 5.0
-edge_strength = 0.9
-arid_sigma = 5.0
+disp_amp = 0.55        # coastline raggedness (fraction of pad)
+coast_aa = 0.5         # sub-pixel anti-alias only; coasts stay crisp
+arid_sigma = 5.0       # softness of the sage<->peach desert transition
+pool_k = 0.72          # how dark a fully-concentrated pigment spot goes (x rgb, hue-preserving)
+sea_gran = 0.16        # sea granulation strength (pigment settling into paper tooth)
+land_gran = 0.28       # land granulation strength (crisp per-pixel pigment granules)
+rim_off = 1.6          # pooled wet edge peaks this many px inside the shoreline
+rim_px = 3.0           # width of the pooled wet edge
+rim_strength = 0.65    # depth of the in-hue pooled wet edge
+gap_px = 2.0           # width of the cream paper gap straddling the shoreline
+gap_strength = 0.72    # how fully the shoreline reverts to paper
 river_px = 1
-river_alpha = 0.22
-speckle_alpha = 0.0
-speckle_thresh = 0.985
+river_alpha = 0.20
+speckle_alpha = 0.10
+speckle_thresh = 0.984
 lake_min_zoom = 4
+draw_rivers = false     # thin river centerlines look bad; wide estuaries come from the coastline
 river_min_zoom = 6
+urban_min_zoom = 5      # paint built-up areas coral from this zoom up (specks below it)
 min_area_px = 3.0
 coast_all_touched = true
-
-# Real watercolour grain derived from the footer illustration (scripts/make_swatches.py).
-[textures]
-paper = "assets/textures/paper.png"
-# granulation = "assets/textures/granulation.png"
 
 # Palette sampled from the perma.earth footer watercolour (ILUSTRA-12-HOME.jpg):
 # sage-green living land, warm peach arid earth, soft teal sea, cream paper. Coral accent reserved.
 [palette]
-land    = "#becbb3"
+land    = "#b7caa8"
 arid    = "#f9c9a6"
 sea     = "#80c4ba"
 lake    = "#9fd5c8"
@@ -48,3 +63,4 @@ river   = "#93c6bf"
 paper   = "#f5e5ce"
 speckle = "#ffffff"
 accent  = "#ea9871"
+urban   = "#ea9871"    # built-up areas painted in the coral accent

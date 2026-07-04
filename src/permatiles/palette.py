@@ -24,10 +24,12 @@ class Palette:
     paper: tuple
     speckle: tuple = (255, 255, 255)
     accent: tuple = (224, 122, 95)
+    urban: tuple = (224, 122, 95)      # built-up areas, painted in the coral accent
 
     @staticmethod
     def from_dict(d: dict) -> "Palette":
         g = lambda k, default: hex_to_rgb(d[k]) if k in d else default
+        accent = g("accent", (224, 122, 95))
         return Palette(
             land=hex_to_rgb(d["land"]),
             arid=g("arid", (233, 195, 156)),
@@ -36,5 +38,6 @@ class Palette:
             river=hex_to_rgb(d["river"]),
             paper=hex_to_rgb(d["paper"]),
             speckle=g("speckle", (255, 255, 255)),
-            accent=g("accent", (224, 122, 95)),
+            accent=accent,
+            urban=g("urban", accent),
         )

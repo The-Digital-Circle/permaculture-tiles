@@ -3,7 +3,7 @@ import os
 import tomllib
 from . import data, tiles, pack
 from .palette import Palette
-from .textures import fractal_noise, granulation, load_swatch
+from .textures import fractal_noise, brush_density, paper_grain
 from .prune import shared_ocean_tile
 from .quantise import to_png8
 
@@ -12,22 +12,30 @@ def load_config(path: str) -> dict:
         return tomllib.load(f)
 
 def build_textures(cfg: dict) -> dict:
-    # Ocean is a single 256px tile reused everywhere, so its contrast is compressed toward the mean
-    # (ocean_contrast < 1) to keep the unavoidable tile repetition too subtle to read as a pattern,
-    # while staying perfectly seamless.
+    # 'sea_density' is ONE tile-periodic (256px) pigment field reused for every open-water tile, so
+    # the ocean stays seamless and prunable; its stroke count and contrast are kept low so the
+    # unavoidable repeat reads as a calm wash, not a pattern. 'land_density' is a large
+    # world-continuous field, so land brushwork varies from tile to tile.
     seed = cfg["seed"]
-    ocean = fractal_noise(256, cfg["ocean_cells"], cfg["ocean_octaves"], seed + 100)
-    k = cfg.get("ocean_contrast", 1.0)
-    ocean = 0.5 + (ocean - 0.5) * k
     tsize = cfg["paper_tex_size"]
-    tx = cfg.get("textures", {})
-    def swatch_or(key, fallback):
-        path = tx.get(key)
-        return load_swatch(path, tsize) if path else fallback
     return {
-        "paper": swatch_or("paper", fractal_noise(tsize, cfg["paper_cells"], cfg["paper_octaves"], seed)),
-        "ocean": ocean,
-        "granulation": swatch_or("granulation", granulation(tsize, seed + 5)),
+        "land_density": brush_density(tsize, seed + 40,
+                                      base=cfg.get("land_base", 0.82),
+                                      span=cfg.get("land_span", 0.16),
+                                      tooth_amp=cfg.get("tooth_amp", 0.20),
+                                      floor=cfg.get("land_floor", 0.52),
+                                      bloom=cfg.get("land_bloom", 0.15),
+                                      angle=(cfg.get("land_angle_lo", 0.2),
+                                             cfg.get("land_angle_hi", 1.0))),
+        "sea_density": brush_density(256, seed + 100,
+                                     base=cfg.get("sea_base", 0.90),
+                                     span=cfg.get("sea_span", 0.06),
+                                     tooth_amp=cfg.get("sea_tooth_amp", 0.14),
+                                     floor=cfg.get("sea_floor", 0.60),
+                                     strokes=cfg.get("sea_strokes", 0.0),
+                                     bloom=cfg.get("sea_bloom", 0.0)),
+        "land_grain": paper_grain(tsize, seed + 200),   # CRISP per-pixel granulation (world-continuous)
+        "sea_grain": paper_grain(256, seed + 210),      # CRISP, tile-periodic (seam-safe)
         "disp_x": fractal_noise(tsize, 8, 4, seed + 991),
         "disp_y": fractal_noise(tsize, 8, 4, seed + 613),
         "speckle": fractal_noise(256, 64, 1, seed + 300),

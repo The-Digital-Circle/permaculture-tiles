@@ -4,12 +4,14 @@ import geopandas as gpd
 from shapely.geometry import box
 
 NE_BASE = "https://naciscdn.org/naturalearth/10m/physical"
+NE_CULTURAL = "https://naciscdn.org/naturalearth/10m/cultural"
 LAYERS = {
     "land":   "ne_10m_land.zip",
     "ocean":  "ne_10m_ocean.zip",
     "lakes":  "ne_10m_lakes.zip",
     "rivers": "ne_10m_rivers_lake_centerlines.zip",
 }
+URBAN_FILE = "ne_10m_urban_areas.zip"   # cultural layer: built-up urban footprints (painted coral)
 MERC_LAT = 85.0511287798066
 
 def merc_clip_box():
@@ -26,14 +28,21 @@ def download(data_dir: str) -> None:
         r.raise_for_status()
         with open(dest, "wb") as f:
             f.write(r.content)
+    dest = os.path.join(data_dir, URBAN_FILE)
+    if not os.path.exists(dest):
+        r = requests.get(f"{NE_CULTURAL}/{URBAN_FILE}", timeout=180)
+        r.raise_for_status()
+        with open(dest, "wb") as f:
+            f.write(r.content)
 
 class GeoData:
-    def __init__(self, land, ocean, lakes, rivers, arid=None):
+    def __init__(self, land, ocean, lakes, rivers, arid=None, urban=None):
         self.land = land
         self.ocean = ocean
         self.lakes = lakes
         self.rivers = rivers
         self.arid = arid
+        self.urban = urban
 
 def load(data_dir: str) -> "GeoData":
     clip = merc_clip_box()
@@ -51,4 +60,11 @@ def load(data_dir: str) -> "GeoData":
         if a.crs is None:
             a = a.set_crs(4326)
         arid = gpd.clip(a, clip).to_crs(3857).reset_index(drop=True)
-    return GeoData(frames["land"], frames["ocean"], frames["lakes"], frames["rivers"], arid)
+    urban = None
+    urban_path = os.path.join(data_dir, URBAN_FILE)
+    if os.path.exists(urban_path):
+        u = gpd.read_file(f"zip://{urban_path}")
+        if u.crs is None:
+            u = u.set_crs(4326)
+        urban = gpd.clip(u, clip).to_crs(3857).reset_index(drop=True)
+    return GeoData(frames["land"], frames["ocean"], frames["lakes"], frames["rivers"], arid, urban)

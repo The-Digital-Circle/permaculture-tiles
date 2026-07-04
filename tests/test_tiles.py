@@ -8,9 +8,11 @@ PAL = Palette(land=(169, 184, 154), arid=(233, 195, 156), sea=(143, 198, 192),
               speckle=(255, 255, 255), accent=(224, 122, 95))
 
 def _tex():
-    return {"paper": textures.fractal_noise(1024, 16, 4, 7),
-            "ocean": textures.fractal_noise(256, 8, 3, 107),
-            "granulation": textures.granulation(512, 5),
+    return {"land_density": textures.brush_density(512, 40),
+            "sea_density": textures.brush_density(256, 100, base=0.90, span=0.08,
+                                                  tooth_amp=0.14, floor=0.60, strokes=0.35),
+            "land_grain": textures.paper_grain(512, 200),
+            "sea_grain": textures.paper_grain(256, 210),
             "disp_x": textures.fractal_noise(512, 8, 4, 991),
             "disp_y": textures.fractal_noise(512, 8, 4, 613),
             "speckle": textures.fractal_noise(256, 64, 1, 300)}

@@ -12,28 +12,33 @@ def _padded_bounds(z, x, y, pad, size):
     m = (maxx - minx) * (pad / size)
     return (minx - m, miny - m, maxx + m, maxy + m)
 
-_DEFAULT_MASK_OPTS = {"lake_min_zoom": 4, "river_min_zoom": 6, "min_area_px": 3.0,
-                      "coast_all_touched": True}
+_DEFAULT_MASK_OPTS = {"lake_min_zoom": 4, "river_min_zoom": 6, "urban_min_zoom": 5,
+                      "draw_rivers": False, "min_area_px": 3.0, "coast_all_touched": True}
 
 def build_masks(z, x, y, geodata, pad, size, opts=None):
-    """Build the {land, arid, lake, river} boolean mask dict (P,P) for one tile, P = size + 2*pad.
+    """Build the {land, arid, lake, river, urban} boolean mask dict (P,P) for one tile, P = size+2*pad.
 
-    Lakes are zeroed below opts['lake_min_zoom'] (default 4) and rivers below opts['river_min_zoom']
-    (default 6) so inland water stops cluttering low-zoom tiles as busy veins. Sub-pixel features
-    are dropped via min_area_px (does not apply to line-geometry rivers, which have zero area)."""
+    Lakes are zeroed below opts['lake_min_zoom'] (default 4), rivers below opts['river_min_zoom']
+    (default 6) and urban footprints below opts['urban_min_zoom'] (default 5), so inland detail stops
+    cluttering low-zoom tiles. Sub-pixel features are dropped via min_area_px (does not apply to
+    line-geometry rivers, which have zero area)."""
     o = {**_DEFAULT_MASK_OPTS, **(opts or {})}
     P = size + 2 * pad
     pb = _padded_bounds(z, x, y, pad, size)
     def m(gdf, all_touched=False):
         return rasterise(clip_geoms(gdf, pb), pb, P, P,
                          all_touched=all_touched, min_area_px=o["min_area_px"])
+    zeros = np.zeros((P, P), dtype=bool)
     land = m(geodata.land, all_touched=o["coast_all_touched"])
-    arid = m(geodata.arid) if getattr(geodata, "arid", None) is not None else \
-           np.zeros((P, P), dtype=bool)
-    lake = m(geodata.lakes) if z >= o["lake_min_zoom"] else np.zeros((P, P), dtype=bool)
+    arid = m(geodata.arid) if getattr(geodata, "arid", None) is not None else zeros.copy()
+    lake = m(geodata.lakes) if z >= o["lake_min_zoom"] else zeros.copy()
+    # River centerlines are thin threads with no width and look bad; off by default. Wide, lake-like
+    # waters (Thames/Severn/St Lawrence estuaries) already render as sea through the coastline.
     river = rasterise(clip_geoms(geodata.rivers, pb), pb, P, P, all_touched=False, min_area_px=0.0) \
-            if z >= o["river_min_zoom"] else np.zeros((P, P), dtype=bool)
-    return {"land": land, "arid": arid, "lake": lake, "river": river}
+            if o["draw_rivers"] and z >= o["river_min_zoom"] else zeros.copy()
+    urban = m(geodata.urban) if getattr(geodata, "urban", None) is not None \
+            and z >= o["urban_min_zoom"] else zeros.copy()
+    return {"land": land, "arid": arid, "lake": lake, "river": river, "urban": urban}
 
 def render_tile(z, x, y, geodata, textures, palette, pad, size, opts=None):
     """Render one tile to PNG8 bytes, or None if it is pure open ocean (pruned)."""

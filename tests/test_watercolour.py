@@ -9,9 +9,11 @@ PAL = Palette(land=(169, 184, 154), arid=(233, 195, 156), sea=(143, 198, 192),
 SIZE, PAD = 256, 24
 
 def _textures():
-    return {"paper": textures.fractal_noise(1024, 16, 4, 7),
-            "ocean": textures.fractal_noise(256, 8, 3, 107),
-            "granulation": textures.granulation(512, 5),
+    return {"land_density": textures.brush_density(512, 40),
+            "sea_density": textures.brush_density(256, 100, base=0.90, span=0.08,
+                                                  tooth_amp=0.14, floor=0.60, strokes=0.35),
+            "land_grain": textures.paper_grain(512, 200),
+            "sea_grain": textures.paper_grain(256, 210),
             "disp_x": textures.fractal_noise(512, 8, 4, 991),
             "disp_y": textures.fractal_noise(512, 8, 4, 613),
             "speckle": textures.fractal_noise(256, 64, 1, 300)}
@@ -21,12 +23,15 @@ def _empty():
     z = np.zeros((p, p), dtype=bool)
     return {"land": z.copy(), "arid": z.copy(), "lake": z.copy(), "river": z.copy()}
 
-def _land_centre(arid=False):
+def _land_centre(arid=False, urban=False):
     p = SIZE + 2 * PAD
     m = _empty()
     m["land"][p // 2 - 40:p // 2 + 40, p // 2 - 40:p // 2 + 40] = True
     if arid:
         m["arid"][p // 2 - 40:p // 2 + 40, p // 2 - 40:p // 2 + 40] = True
+    if urban:
+        m["urban"] = np.zeros((p, p), dtype=bool)
+        m["urban"][p // 2 - 20:p // 2 + 20, p // 2 - 20:p // 2 + 20] = True
     return m
 
 def test_output_shape_and_dtype():
@@ -67,10 +72,24 @@ def test_arid_centre_is_peach_not_sage():
     peach = int(render_padded(_land_centre(arid=True), PAL, _textures(), 0, 0, PAD, SIZE)[cx, cx, 0])
     assert peach > green        # peach arid land has more red than sage green land
 
-def test_wet_edges_pool_darker_same_hue_no_navy():
+def test_urban_centre_is_coral():
+    cx = SIZE // 2
+    out = render_padded(_land_centre(urban=True), PAL, _textures(), 0, 0, PAD, SIZE)[..., :3].astype(int)
+    r, g, b = out[cx, cx]
+    assert r > g > b            # coral urban fill is warm: red dominant, then green, then blue
+    sage = render_padded(_land_centre(urban=False), PAL, _textures(), 0, 0, PAD, SIZE)[cx, cx, :3].astype(int)
+    assert r - b > int(sage[0]) - int(sage[2])   # far warmer than the sage land it replaces
+
+def test_paper_gap_at_coast_is_cream_not_ink():
     out = render_padded(_land_centre(), PAL, _textures(), 0, 0, PAD, SIZE)[..., :3].astype(int)
-    brightness = out.sum(axis=2)
-    assert brightness.min() < sum(PAL.land)          # a pooled edge deeper than the land base wash
-    y, x = np.unravel_index(int(np.argmin(brightness)), brightness.shape)
-    r, g, b = out[y, x]
-    assert g >= b            # darkest pixel stays in-hue (sage/teal); never a navy outline (b>g)
+    paper = np.array(PAL.paper)
+    d = np.abs(out - paper).sum(axis=2)              # per-pixel distance to the cream paper colour
+    row = SIZE // 2
+    interior = d[row, SIZE // 2]                     # sage land, far from any coast
+    sea = d[row, 6]                                  # open teal sea
+    coast = d[row, 68:108]                           # the left shoreline of the centred land square
+    # the shoreline reverts toward paper (a cream gap), unlike the land wash or the open sea
+    assert coast.min() < interior and coast.min() < sea
+    gx = 68 + int(np.argmin(coast))
+    r, g, b = out[row, gx]
+    assert r > 170 and g > 170 and b > 150          # bright cream, never a dark ink outline
