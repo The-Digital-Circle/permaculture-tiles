@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Permatiles
  * Description: Serves the self-hosted watercolour basemap (PMTiles) for the perma.earth global map.
- * Version: 0.1.2
+ * Version: 0.1.3
  * Requires PHP: 7.4
  */
 
@@ -10,7 +10,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('PERMATILES_VERSION', '0.1.2');
+define('PERMATILES_VERSION', '0.1.3');
 define('PERMATILES_DIR', plugin_dir_path(__FILE__));
 define('PERMATILES_DATA_DIR', trailingslashit(wp_upload_dir()['basedir']) . 'permatiles');
 
@@ -114,14 +114,30 @@ add_action('admin_post_permatiles_pull', function () {
     $updater = new Permatiles_Updater($s['repo'], PERMATILES_DATA_DIR);
     wp_mkdir_p(PERMATILES_DATA_DIR);
     $r = $updater->pull();
-    if ($r['ok']) { $r['extracted'] = Permatiles_Extractor::run(PERMATILES_DATA_DIR); }
+    if ($r['ok']) {
+        $r['extracted'] = Permatiles_Extractor::run(PERMATILES_DATA_DIR);
+        if (! empty($r['extracted']['ok'])) { permatiles_drop_source(); }
+    }
     set_transient('permatiles_last_pull', $r, 600);
     wp_safe_redirect(admin_url('options-general.php?page=permatiles&pulled=' . ($r['ok'] ? '1' : '0')));
     exit;
 });
 
+/**
+ * Delete the source PMTiles once the static tree is built and verified — the map serves the static
+ * tiles, so the multi-hundred-MB PMTiles is dead weight on disk. Guarded on the tree existing, so we
+ * never drop the source when there is nothing to fall back to.
+ */
+function permatiles_drop_source() {
+    if (! is_file(PERMATILES_DATA_DIR . '/tiles/0/0/0.png')) { return 0; }
+    $manifest = new Permatiles_Manifest(PERMATILES_DATA_DIR);
+    $n = 0;
+    foreach ($manifest->tile_files() as $f) { if (@unlink($f)) { $n++; } }
+    return $n;
+}
+
 if (defined('WP_CLI') && WP_CLI) {
-    // Pull the latest release, then expand it into the static tile pyramid the map actually serves.
+    // Pull the latest release, expand it into the static pyramid the map serves, then drop the source.
     WP_CLI::add_command('permatiles pull', function () {
         $s = permatiles_settings();
         wp_mkdir_p(PERMATILES_DATA_DIR);
@@ -129,13 +145,15 @@ if (defined('WP_CLI') && WP_CLI) {
         if (! $r['ok']) { WP_CLI::error($r['message']); }
         WP_CLI::log($r['message']);
         $e = Permatiles_Extractor::run(PERMATILES_DATA_DIR);
-        WP_CLI::success($e ? "extracted {$e['tiles']} land + {$e['ocean']} ocean tiles" : 'pulled (no extract)');
+        if (empty($e['ok'])) { WP_CLI::error('extract failed: ' . ($e['message'] ?? 'unknown')); }
+        $dropped = permatiles_drop_source();
+        WP_CLI::success("extracted {$e['tiles']} land + {$e['ocean']} ocean tiles; dropped {$dropped} source pmtiles");
     });
 
-    // Re-expand the static pyramid from files already on disk (no re-download).
+    // Re-expand the static pyramid from files already on disk (needs the source pmtiles present).
     WP_CLI::add_command('permatiles extract', function () {
         $e = Permatiles_Extractor::run(PERMATILES_DATA_DIR);
-        if ($e === null) { WP_CLI::error('no manifest to extract'); }
+        if (empty($e['ok'])) { WP_CLI::error($e['message'] ?? 'extract failed'); }
         WP_CLI::success("extracted {$e['tiles']} land + {$e['ocean']} ocean tiles");
     });
 }

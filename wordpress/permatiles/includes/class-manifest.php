@@ -36,6 +36,15 @@ class Permatiles_Manifest {
         return $this->dir . '/' . $name;
     }
 
+    /** Absolute paths of every PMTiles file named in the manifest (the extraction source set). */
+    public function tile_files() {
+        $out = [];
+        foreach ($this->data()['tiles'] ?? [] as $t) {
+            if (! empty($t['file'])) { $out[] = $this->dir . '/' . $t['file']; }
+        }
+        return $out;
+    }
+
     /** Absolute path to the PMTiles file that should hold (z,x,y), or null. */
     public function file_for($z, $x, $y) {
         foreach ($this->data()['tiles'] ?? [] as $t) {

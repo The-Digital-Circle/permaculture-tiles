@@ -58,12 +58,20 @@ class Permatiles_Extractor {
     }
 
     /**
-     * Build the resolver + run extraction for a pulled release living in $data_dir. Returns the
-     * extract() counts, or null if the manifest is missing/invalid.
+     * Build the resolver + run extraction for a pulled release living in $data_dir.
+     * @return array{ok:bool, message?:string, tiles?:int, ocean?:int}
+     *
+     * Refuses (without touching the served tree) if a source PMTiles is missing — otherwise every
+     * position would resolve to ocean and the map would go blank. Re-pull to restore the source.
      */
     public static function run($data_dir) {
         $manifest = new Permatiles_Manifest($data_dir);
-        if (! $manifest->exists()) { return null; }
+        if (! $manifest->exists()) { return ['ok' => false, 'message' => 'no manifest']; }
+        foreach ($manifest->tile_files() as $f) {
+            if (! is_file($f)) {
+                return ['ok' => false, 'message' => 'missing source ' . basename($f) . ' — re-pull to rebuild'];
+            }
+        }
         $readers = [];
         $resolve = function ($z, $x, $y) use ($manifest, &$readers) {
             $file = $manifest->file_for($z, $x, $y);
@@ -71,7 +79,8 @@ class Permatiles_Extractor {
             if (! isset($readers[$file])) { $readers[$file] = new Permatiles_PMTiles_Reader($file); }
             return $readers[$file]->get_tile($z, $x, $y);
         };
-        return self::extract((int) $manifest->maxzoom(), $resolve,
+        $counts = self::extract((int) $manifest->maxzoom(), $resolve,
             $manifest->ocean_tile_path(), rtrim($data_dir, '/') . '/tiles');
+        return ['ok' => true, 'tiles' => $counts['tiles'], 'ocean' => $counts['ocean']];
     }
 }

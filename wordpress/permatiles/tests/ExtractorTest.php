@@ -47,4 +47,36 @@ class ExtractorTest extends TestCase {
         $this->assertFileDoesNotExist("$this->dest/stale.png");   // tree wiped and rebuilt
         $this->assertFileExists("$this->dest/0/0/0.png");
     }
+
+    /** Assemble a data dir (manifest + mini.pmtiles + ocean) so run() can be exercised end to end. */
+    private function make_data_dir() {
+        mkdir($this->dest, 0777, true);
+        copy(__DIR__ . '/fixtures/mini.pmtiles', "$this->dest/mini.pmtiles");
+        copy(__DIR__ . '/fixtures/ocean.png', "$this->dest/ocean.png");
+        file_put_contents("$this->dest/manifest.json", json_encode([
+            'tiles' => [['file' => 'mini.pmtiles', 'minzoom' => 0, 'maxzoom' => 2]],
+            'ocean_tile' => 'ocean.png', 'maxzoom' => 2, 'attribution' => 'fixture',
+        ]));
+    }
+
+    public function test_run_extracts_from_manifest() {
+        $this->make_data_dir();
+        $r = Permatiles_Extractor::run($this->dest);
+        $this->assertTrue($r['ok']);
+        $this->assertSame(4, $r['tiles']);
+        $this->assertSame(17, $r['ocean']);
+        $this->assertSame('DDD', file_get_contents("$this->dest/tiles/2/2/1.png"));
+    }
+
+    public function test_run_refuses_when_source_missing_and_keeps_tree() {
+        $this->make_data_dir();
+        Permatiles_Extractor::run($this->dest);                 // build a good tree first
+        unlink("$this->dest/mini.pmtiles");                     // source gone (e.g. dropped)
+
+        $r = Permatiles_Extractor::run($this->dest);
+
+        $this->assertFalse($r['ok']);                           // refuses rather than wiping to all-ocean
+        $this->assertStringContainsString('missing source', $r['message']);
+        $this->assertSame('DDD', file_get_contents("$this->dest/tiles/2/2/1.png"));   // tree intact
+    }
 }
