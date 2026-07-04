@@ -10,18 +10,19 @@ scratch_dir = "build/scratch"
 pmtiles_cap = 1900000000
 attribution = "Natural Earth"
 
-paper_tex_size = 1024
-paper_cells = 16
-paper_octaves = 4
+paper_tex_size = 512
+paper_cells = 32
+paper_octaves = 5
 ocean_cells = 8
 ocean_octaves = 3
 ocean_contrast = 0.4
 
 [render]
-coast_sigma = 1.6
-disp_amp = 0.9
-edge_px = 6.0
-edge_strength = 0.5
+coast_sigma = 0.9
+disp_amp = 0.55
+edge_px = 5.0
+edge_strength = 0.9
+arid_sigma = 5.0
 river_px = 1
 river_alpha = 0.22
 speckle_alpha = 0.0
@@ -31,19 +32,19 @@ river_min_zoom = 6
 min_area_px = 3.0
 coast_all_touched = true
 
-# Optional real watercolour swatches (built by scripts/make_swatches.py). Absent => procedural.
+# Real watercolour grain derived from the footer illustration (scripts/make_swatches.py).
 [textures]
-# paper = "assets/textures/paper.png"
+paper = "assets/textures/paper.png"
 # granulation = "assets/textures/granulation.png"
 
 # Palette sampled from the perma.earth footer watercolour (ILUSTRA-12-HOME.jpg):
 # sage-green living land, warm peach arid earth, soft teal sea, cream paper. Coral accent reserved.
 [palette]
-land    = "#a9b89a"
-arid    = "#e9c39c"
-sea     = "#8fc6c0"
-lake    = "#a7d2c9"
+land    = "#becbb3"
+arid    = "#f9c9a6"
+sea     = "#80c4ba"
+lake    = "#9fd5c8"
 river   = "#93c6bf"
-paper   = "#f5efe2"
+paper   = "#f5e5ce"
 speckle = "#ffffff"
-accent  = "#e07a5f"
+accent  = "#ea9871"

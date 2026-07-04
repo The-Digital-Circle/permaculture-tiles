@@ -5,7 +5,8 @@ from .palette import darker
 
 _DEFAULT_OPTS = {
     "coast_sigma": 1.6, "disp_amp": 0.9, "edge_px": 6.0, "edge_strength": 0.5,
-    "river_px": 1, "river_alpha": 0.22, "speckle_alpha": 0.0, "speckle_thresh": 0.985,
+    "arid_sigma": 3.0, "river_px": 1, "river_alpha": 0.22,
+    "speckle_alpha": 0.0, "speckle_thresh": 0.985,
 }
 
 def _wash(color, tex, lo=0.86, hi=1.06):
@@ -43,10 +44,13 @@ def render_padded(masks, palette, textures, gx0, gy0, pad, size, *, opts=None):
         arid_w = warp(masks["arid"]) * land_w
         land_a = ndimage.gaussian_filter(land_w, o["coast_sigma"])
         lake_a = ndimage.gaussian_filter(lake_w, o["coast_sigma"])
+        # feather the desert boundary more softly than the coast, so sage->peach reads as a gradual
+        # painted transition rather than a hard line
+        arid_a = ndimage.gaussian_filter(arid_w, o["arid_sigma"])
 
         # base washes: two-tone land (sage vs peach), then lakes
-        land_rgb = (_wash(palette.land, paper) * (1 - arid_w[..., None])
-                    + _wash(palette.arid, paper) * arid_w[..., None])
+        land_rgb = (_wash(palette.land, paper) * (1 - arid_a[..., None])
+                    + _wash(palette.arid, paper) * arid_a[..., None])
         img = img * (1 - land_a[..., None]) + land_rgb * land_a[..., None]
         img = img * (1 - lake_a[..., None]) + _wash(palette.lake, paper) * lake_a[..., None]
 
@@ -65,8 +69,8 @@ def render_padded(masks, palette, textures, gx0, gy0, pad, size, *, opts=None):
             land_band = np.zeros_like(land_a)
         else:
             land_band = band(ndimage.distance_transform_edt(land_bin)) * land_a
-        land_edge_rgb = (np.array(darker(palette.land), np.float32) * (1 - arid_w[..., None])
-                         + np.array(darker(palette.arid), np.float32) * arid_w[..., None])
+        land_edge_rgb = (np.array(darker(palette.land), np.float32) * (1 - arid_a[..., None])
+                         + np.array(darker(palette.arid), np.float32) * arid_a[..., None])
         def pool(im, b, tone):
             a = np.clip(b * o["edge_strength"], 0, 1)[..., None]
             return im * (1 - a) + tone * a
