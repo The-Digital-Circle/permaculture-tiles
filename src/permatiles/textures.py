@@ -38,3 +38,33 @@ def sample_periodic(tex: np.ndarray, gx0: int, gy0: int, w: int, h: int) -> np.n
     xs = (gx0 + np.arange(w)) % T
     ys = (gy0 + np.arange(h)) % T
     return tex[np.ix_(ys, xs)]
+
+def make_tileable(arr: np.ndarray) -> np.ndarray:
+    """Blend an array with its half-offset self so opposite edges match -> seamless when wrapped.
+    Classic offset-and-cross-fade: guarantees continuity across the wrap in both axes."""
+    a = arr.astype(np.float64)
+    a = (a - a.min()) / (np.ptp(a) + 1e-9)
+    h, w = a.shape
+    rolled = np.roll(np.roll(a, h // 2, axis=0), w // 2, axis=1)
+    yy = np.abs(np.linspace(-1, 1, h))[:, None]
+    xx = np.abs(np.linspace(-1, 1, w))[None, :]
+    wgt = np.clip(1 - np.maximum(yy, xx), 0, 1)     # trust centre, cross-fade to rolled at edges
+    out = a * wgt + rolled * (1 - wgt)
+    return (out - out.min()) / (np.ptp(out) + 1e-9)
+
+def granulation(size: int, seed: int) -> np.ndarray:
+    """Tileable pigment grain: a mid-frequency wash blotch times a fine paper-tooth speckle.
+    High local variance (real granulation) unlike the smooth value-noise it replaces; seamless."""
+    blotch = fractal_noise(size, base_cells=size // 16, octaves=3, seed=seed)
+    tooth  = fractal_noise(size, base_cells=size // 3,  octaves=2, seed=seed + 51)
+    g = 0.6 * blotch + 0.4 * tooth
+    return (g - g.min()) / (np.ptp(g) + 1e-9)
+
+def load_swatch(path: str, size: int | None = None) -> np.ndarray:
+    """Load a PNG as a [0,1] luma texture, optionally resized, made seamlessly tileable."""
+    from PIL import Image
+    img = Image.open(path).convert("L")
+    if size:
+        img = img.resize((size, size), Image.LANCZOS)
+    arr = np.asarray(img, dtype=np.float64) / 255.0
+    return make_tileable(arr)
