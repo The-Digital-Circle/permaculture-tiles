@@ -1,5 +1,6 @@
 import os
 from concurrent.futures import ProcessPoolExecutor
+import numpy as np
 from . import geo
 from .masks import rasterise, clip_geoms
 from .watercolour import render_padded
@@ -11,22 +12,40 @@ def _padded_bounds(z, x, y, pad, size):
     m = (maxx - minx) * (pad / size)
     return (minx - m, miny - m, maxx + m, maxy + m)
 
-def render_tile(z, x, y, geodata, textures, palette, pad, size):
-    """Render one tile to PNG8 bytes, or None if it is pure open ocean (pruned)."""
+_DEFAULT_MASK_OPTS = {"lake_min_zoom": 4, "river_min_zoom": 6, "min_area_px": 3.0,
+                      "coast_all_touched": True}
+
+def build_masks(z, x, y, geodata, pad, size, opts=None):
+    """Build the {land, arid, lake, river} boolean mask dict (P,P) for one tile, P = size + 2*pad.
+
+    Lakes are zeroed below opts['lake_min_zoom'] (default 4) and rivers below opts['river_min_zoom']
+    (default 6) so inland water stops cluttering low-zoom tiles as busy veins. Sub-pixel features
+    are dropped via min_area_px (does not apply to line-geometry rivers, which have zero area)."""
+    o = {**_DEFAULT_MASK_OPTS, **(opts or {})}
     P = size + 2 * pad
     pb = _padded_bounds(z, x, y, pad, size)
-    masks = {
-        "land":  rasterise(clip_geoms(geodata.land, pb),  pb, P, P),
-        "lake":  rasterise(clip_geoms(geodata.lakes, pb), pb, P, P),
-        "river": rasterise(clip_geoms(geodata.rivers, pb), pb, P, P),
-    }
+    def m(gdf, all_touched=False):
+        return rasterise(clip_geoms(gdf, pb), pb, P, P,
+                         all_touched=all_touched, min_area_px=o["min_area_px"])
+    land = m(geodata.land, all_touched=o["coast_all_touched"])
+    arid = m(geodata.arid) if getattr(geodata, "arid", None) is not None else \
+           np.zeros((P, P), dtype=bool)
+    lake = m(geodata.lakes) if z >= o["lake_min_zoom"] else np.zeros((P, P), dtype=bool)
+    river = rasterise(clip_geoms(geodata.rivers, pb), pb, P, P, all_touched=False, min_area_px=0.0) \
+            if z >= o["river_min_zoom"] else np.zeros((P, P), dtype=bool)
+    return {"land": land, "arid": arid, "lake": lake, "river": river}
+
+def render_tile(z, x, y, geodata, textures, palette, pad, size, opts=None):
+    """Render one tile to PNG8 bytes, or None if it is pure open ocean (pruned)."""
+    masks = build_masks(z, x, y, geodata, pad, size, opts)
     centre = {k: v[pad:pad + size, pad:pad + size] for k, v in masks.items()}
     if is_pure_ocean(centre):
         return None
     gx0, gy0 = geo.world_px_origin(z, x, y)
     return to_png8(render_padded(masks, palette, textures, gx0, gy0, pad, size))
 
-def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bbox_tiles=None):
+def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bbox_tiles=None,
+                opts=None):
     """Render every tile at zoom z, write the PNG tree under out_dir/z/x/y.png, skip pruned tiles.
     bbox_tiles, if given, restricts to (x0,y0,x1,y1) inclusive."""
     n = geo.num_tiles(z)
@@ -34,7 +53,7 @@ def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bb
     written = pruned = 0
     for x in range(x0, x1 + 1):
         for y in range(y0, y1 + 1):
-            png = render_tile(z, x, y, geodata, textures, palette, pad, size)
+            png = render_tile(z, x, y, geodata, textures, palette, pad, size, opts)
             if png is None:
                 pruned += 1
                 continue
@@ -48,22 +67,22 @@ def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bb
 # --- parallel rendering (process pool); workers share geodata/textures via the initializer ---
 _CTX = {}
 
-def _init_worker(geodata, textures, palette, pad, size):
-    _CTX.update(geodata=geodata, textures=textures, palette=palette, pad=pad, size=size)
+def _init_worker(geodata, textures, palette, pad, size, opts=None):
+    _CTX.update(geodata=geodata, textures=textures, palette=palette, pad=pad, size=size, opts=opts)
 
 def _render_one(args):
     z, x, y = args
     png = render_tile(z, x, y, _CTX["geodata"], _CTX["textures"], _CTX["palette"],
-                      _CTX["pad"], _CTX["size"])
+                      _CTX["pad"], _CTX["size"], _CTX.get("opts"))
     return (z, x, y, png)
 
-def render_zoom_parallel(z, geodata, textures, palette, out_dir, pad, size, workers):
+def render_zoom_parallel(z, geodata, textures, palette, out_dir, pad, size, workers, opts=None):
     """Same as render_zoom but fans tiles across a process pool. Used for the big zooms (z>=4)."""
     n = geo.num_tiles(z)
     jobs = [(z, x, y) for x in range(n) for y in range(n)]
     written = pruned = 0
     with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
-                             initargs=(geodata, textures, palette, pad, size)) as ex:
+                             initargs=(geodata, textures, palette, pad, size, opts)) as ex:
         for z_, x, y, png in ex.map(_render_one, jobs, chunksize=16):
             if png is None:
                 pruned += 1

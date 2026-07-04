@@ -21,3 +21,23 @@ def test_render_zoom_writes_land_prunes_ocean(tmp_path, synthetic_geodata):
 def test_render_tile_returns_none_for_open_ocean(synthetic_geodata):
     png = tiles.render_tile(1, 0, 0, synthetic_geodata, _tex(), PAL, pad=24, size=256)
     assert png is None
+
+def test_lakes_and_rivers_gated_below_min_zoom(synthetic_geodata):
+    # at z1 (below lake_min_zoom=4, river_min_zoom=6) inland water is suppressed: the tile still
+    # renders (land present) but no lake/river pixels are drawn. We assert via mask build.
+    from permatiles import tiles as T
+    m = T.build_masks(1, 1, 0, synthetic_geodata, pad=24, size=256, opts=None)
+    assert m["land"].any()
+    assert not m["lake"].any()
+    assert not m["river"].any()
+
+def test_lakes_present_at_high_zoom(synthetic_geodata):
+    # a z6 tile covering the synthetic lake's centroid actually draws lake pixels (gate open at z>=4)
+    from permatiles import tiles as T, geo
+    z = 6
+    cx3, cy3 = geo.ORIGIN * 0.45, geo.ORIGIN * 0.15     # centroid of the fixture lake box
+    span = geo.tile_span_m(z)
+    x = int((cx3 + geo.ORIGIN) / span)
+    y = int((geo.ORIGIN - cy3) / span)
+    m = T.build_masks(z, x, y, synthetic_geodata, pad=24, size=256, opts=None)
+    assert m["lake"].any()          # real assertion: lake is present, not gated away
