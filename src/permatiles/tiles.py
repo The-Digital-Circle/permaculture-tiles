@@ -42,7 +42,7 @@ def render_tile(z, x, y, geodata, textures, palette, pad, size, opts=None):
     if is_pure_ocean(centre):
         return None
     gx0, gy0 = geo.world_px_origin(z, x, y)
-    return to_png8(render_padded(masks, palette, textures, gx0, gy0, pad, size))
+    return to_png8(render_padded(masks, palette, textures, gx0, gy0, pad, size, opts=opts))
 
 def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bbox_tiles=None,
                 opts=None):

@@ -3,12 +3,17 @@ import numpy as np
 from permatiles import textures, tiles
 from permatiles.palette import Palette
 
-PAL = Palette((205, 191, 163), (169, 199, 208), (183, 210, 216),
-              (159, 191, 201), (110, 138, 147), (232, 224, 208))
+PAL = Palette(land=(169, 184, 154), arid=(233, 195, 156), sea=(143, 198, 192),
+              lake=(167, 210, 201), river=(147, 198, 191), paper=(245, 239, 226),
+              speckle=(255, 255, 255), accent=(224, 122, 95))
 
 def _tex():
     return {"paper": textures.fractal_noise(1024, 16, 4, 7),
-            "ocean": textures.fractal_noise(256, 8, 3, 107)}
+            "ocean": textures.fractal_noise(256, 8, 3, 107),
+            "granulation": textures.granulation(512, 5),
+            "disp_x": textures.fractal_noise(512, 8, 4, 991),
+            "disp_y": textures.fractal_noise(512, 8, 4, 613),
+            "speckle": textures.fractal_noise(256, 64, 1, 300)}
 
 def test_render_zoom_writes_land_prunes_ocean(tmp_path, synthetic_geodata):
     # z1 has 4 tiles: eastern column (x=1) is land, western column (x=0) is open ocean -> pruned

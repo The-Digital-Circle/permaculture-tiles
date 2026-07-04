@@ -7,10 +7,10 @@ def is_pure_ocean(centre_masks) -> bool:
     return not (centre_masks["land"].any() or centre_masks["lake"].any()
                 or centre_masks["river"].any())
 
-def shared_ocean_tile(palette, textures, pad, size):
+def shared_ocean_tile(palette, textures, pad, size, opts=None):
     """The one canonical open-water tile. Rendered from all-ocean masks at the tile-grid origin,
     so it is tile-periodic and seamless against itself and against coastal tiles' open water."""
     P = size + 2 * pad
     empty = np.zeros((P, P), dtype=bool)
     masks = {"land": empty, "arid": empty.copy(), "lake": empty.copy(), "river": empty.copy()}
-    return render_padded(masks, palette, textures, 0, 0, pad, size)
+    return render_padded(masks, palette, textures, 0, 0, pad, size, opts=opts)
