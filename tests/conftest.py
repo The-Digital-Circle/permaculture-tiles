@@ -13,4 +13,7 @@ def synthetic_geodata():
     ocean = gpd.GeoDataFrame(geometry=[box(-O, -O, 0, O)], crs=3857)
     lakes = gpd.GeoDataFrame(geometry=[box(O * 0.4, O * 0.1, O * 0.5, O * 0.2)], crs=3857)
     rivers = gpd.GeoDataFrame(geometry=[LineString([(O * 0.2, 0), (O * 0.2, O * 0.3)])], crs=3857)
-    return data.GeoData(land, ocean, lakes, rivers)
+    arid = gpd.GeoDataFrame(geometry=[box(O * 0.5, -O * 0.3, O * 0.9, O * 0.3)], crs=3857)
+    gd = data.GeoData(land, ocean, lakes, rivers)
+    gd.arid = arid
+    return gd

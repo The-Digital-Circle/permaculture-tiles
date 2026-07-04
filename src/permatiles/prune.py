@@ -12,5 +12,5 @@ def shared_ocean_tile(palette, textures, pad, size):
     so it is tile-periodic and seamless against itself and against coastal tiles' open water."""
     P = size + 2 * pad
     empty = np.zeros((P, P), dtype=bool)
-    masks = {"land": empty, "lake": empty.copy(), "river": empty.copy()}
+    masks = {"land": empty, "arid": empty.copy(), "lake": empty.copy(), "river": empty.copy()}
     return render_padded(masks, palette, textures, 0, 0, pad, size)

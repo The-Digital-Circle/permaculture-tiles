@@ -28,11 +28,12 @@ def download(data_dir: str) -> None:
             f.write(r.content)
 
 class GeoData:
-    def __init__(self, land, ocean, lakes, rivers):
+    def __init__(self, land, ocean, lakes, rivers, arid=None):
         self.land = land
         self.ocean = ocean
         self.lakes = lakes
         self.rivers = rivers
+        self.arid = arid
 
 def load(data_dir: str) -> "GeoData":
     clip = merc_clip_box()
@@ -43,4 +44,11 @@ def load(data_dir: str) -> "GeoData":
             gdf = gdf.set_crs(4326)
         gdf = gpd.clip(gdf, clip).to_crs(3857)
         frames[name] = gdf.reset_index(drop=True)
-    return GeoData(frames["land"], frames["ocean"], frames["lakes"], frames["rivers"])
+    arid = None
+    arid_path = os.path.join(data_dir, "arid.geojson")
+    if os.path.exists(arid_path):
+        a = gpd.read_file(arid_path)
+        if a.crs is None:
+            a = a.set_crs(4326)
+        arid = gpd.clip(a, clip).to_crs(3857).reset_index(drop=True)
+    return GeoData(frames["land"], frames["ocean"], frames["lakes"], frames["rivers"], arid)
