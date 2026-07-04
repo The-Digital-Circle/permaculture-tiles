@@ -55,7 +55,12 @@ def render_padded(masks, palette, textures, gx0, gy0, pad, size, *, opts=None):
         ep = o["edge_px"]
         def band(dist):
             return np.clip(1 - dist / ep, 0, 1) * (0.7 + 0.6 * gran)
-        sea_band = band(ndimage.distance_transform_edt(~land_bin)) * (1 - land_a)
+        if land_bin.any():
+            sea_band = band(ndimage.distance_transform_edt(~land_bin)) * (1 - land_a)
+        else:
+            # no land pixel clears the 0.5 alpha threshold (a sub-pixel speck): ~land_bin is all-True,
+            # which is a degenerate distance_transform_edt input — guard it, mirroring land_bin.all() below.
+            sea_band = np.zeros_like(land_a)
         if land_bin.all():
             land_band = np.zeros_like(land_a)
         else:
