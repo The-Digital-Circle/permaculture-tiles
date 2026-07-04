@@ -1,39 +1,41 @@
-"""Hand-authored arid regions -> data/arid.geojson (fallback to the Köppen raster).
+"""Real desert regions -> data/arid.geojson.
 
-Soft circular blobs over the world's major deserts, in EPSG:4326. The renderer softens and displaces
-them, so rough placement reads as deliberate peach regions. Usage:
+Uses Natural Earth 10m 'geography_regions_polys' (FEATURECLA = "Desert"): 58 named deserts with real
+shapes — Sahara, Libyan, Arabian, Kalahari, Namib, Gobi, Taklimakan, Thar, the Australian deserts,
+Atacama, Sonoran, Chihuahuan, etc. — instead of hand-placed circles. The compositor clips the arid
+mask to land and softens its edge (arid_sigma), so coastlines stay clean. Usage:
 
     python scripts/build_deserts.py data/arid.geojson
 """
+import os
 import sys
 import geopandas as gpd
-from shapely.geometry import Point
+import requests
 
-# (name, lon, lat, radius_degrees)
-DESERTS = [
-    ("Sahara",        13,  23, 19),
-    ("Arabian",       45,  22,  9),
-    ("Thar",          71,  27,  4),
-    ("Karakum",       60,  40,  7),
-    ("Gobi",         102,  42,  8),
-    ("Taklamakan",    82,  39,  5),
-    ("Iran",          58,  32,  6),
-    ("Australian",   132, -25, 11),
-    ("Kalahari",      22, -23,  6),
-    ("Namib",         15, -24,  3),
-    ("Atacama",      -69, -23,  4),
-    ("Patagonia",    -69, -46,  4),
-    ("Southwest US", -111, 35,  7),
-    ("Great Basin",  -117, 40,  4),
-]
+NE_URL = "https://naciscdn.org/naturalearth/10m/physical/ne_10m_geography_regions_polys.zip"
+CACHE = "data/ne_10m_geography_regions_polys.zip"
+
+
+def _regions_zip():
+    if not os.path.exists(CACHE):
+        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+        r = requests.get(NE_URL, timeout=180)
+        r.raise_for_status()
+        with open(CACHE, "wb") as f:
+            f.write(r.content)
+    return CACHE
 
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "data/arid.geojson"
-    blobs = [Point(lon, lat).buffer(r) for _, lon, lat, r in DESERTS]
-    merged = gpd.GeoSeries(blobs, crs=4326).union_all()
+    g = gpd.read_file(f"zip://{_regions_zip()}")
+    fc = g["FEATURECLA"].astype(str).str.contains("Desert", case=False, na=False)
+    deserts = g[fc]
+    if deserts.crs is None:
+        deserts = deserts.set_crs(4326)
+    merged = deserts.to_crs(4326).union_all()
     gpd.GeoDataFrame(geometry=[merged], crs=4326).to_file(out, driver="GeoJSON")
-    print(f"wrote {out}  ({len(DESERTS)} desert blobs)")
+    print(f"wrote {out}  ({len(deserts)} real desert polygons)")
 
 
 if __name__ == "__main__":
