@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Permatiles
  * Description: Serves the self-hosted watercolour basemap (PMTiles) for the perma.earth global map.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Requires PHP: 7.4
  */
 
@@ -10,7 +10,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('PERMATILES_VERSION', '0.1.0');
+define('PERMATILES_VERSION', '0.1.1');
 define('PERMATILES_DIR', plugin_dir_path(__FILE__));
 define('PERMATILES_DATA_DIR', trailingslashit(wp_upload_dir()['basedir']) . 'permatiles');
 

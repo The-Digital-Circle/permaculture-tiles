@@ -69,7 +69,30 @@ class Permatiles_Updater {
             if (file_exists("$tmp/$name")) { @rename("$tmp/$name", "{$this->dest}/$name"); }
         }
         $this->rmdir($tmp);
-        return ['ok' => true, 'message' => 'pulled ' . count($expected) . ' files', 'files' => $expected];
+        // prune leftovers from a previous release (e.g. an old band no longer in the manifest), so the
+        // data dir never accumulates orphaned pmtiles. Only runs on success, so a failed pull keeps the
+        // existing set intact.
+        $removed = self::prune_dir($this->dest, $expected);
+        $msg = 'pulled ' . count($expected) . ' files';
+        if ($removed) { $msg .= ', removed ' . count($removed) . ' stale'; }
+        return ['ok' => true, 'message' => $msg, 'files' => $expected, 'removed' => $removed];
+    }
+
+    /**
+     * Delete every file directly in $dir whose basename is not in $keep. The data dir is owned
+     * exclusively by this plugin, so anything not in the current release set is a stale artifact.
+     * Dotfiles (e.g. the .incoming temp dir) are left alone. Returns the removed basenames.
+     */
+    public static function prune_dir($dir, array $keep) {
+        $keepset = array_flip($keep);
+        $removed = [];
+        foreach (glob(rtrim($dir, '/') . '/*') as $path) {
+            $name = basename($path);
+            if (is_file($path) && ! isset($keepset[$name])) {
+                if (@unlink($path)) { $removed[] = $name; }
+            }
+        }
+        return $removed;
     }
 
     private function download($url, $path) {
