@@ -42,7 +42,7 @@ def render_padded(masks, palette, textures, gx0, gy0, pad, size, *,
     land_a = ndimage.gaussian_filter(land_w, coast_sigma)
     lake_a = ndimage.gaussian_filter(lake_w, coast_sigma)
 
-    img = _wash(palette.ocean, ocean_f)
+    img = _wash(palette.sea, ocean_f)
     img = img * (1 - land_a[..., None]) + _wash(palette.land, paper_f) * land_a[..., None]
     img = img * (1 - lake_a[..., None]) + _wash(palette.lake, paper_f) * lake_a[..., None]
 
