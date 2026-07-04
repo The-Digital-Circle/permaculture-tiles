@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Permatiles
  * Description: Serves the self-hosted watercolour basemap (PMTiles) for the perma.earth global map.
- * Version: 0.1.3
+ * Version: 0.1.5
  * Requires PHP: 7.4
  */
 
@@ -10,7 +10,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('PERMATILES_VERSION', '0.1.3');
+define('PERMATILES_VERSION', '0.1.5');
 define('PERMATILES_DIR', plugin_dir_path(__FILE__));
 define('PERMATILES_DATA_DIR', trailingslashit(wp_upload_dir()['basedir']) . 'permatiles');
 
@@ -168,8 +168,14 @@ if (is_admin()) {
  *
  * Serves the pre-extracted tiles straight from uploads/ (nginx, no PHP per tile) — NOT the PHP
  * /permatiles/ endpoint, which boots all of WordPress per request (~1.5s) and, under a map view's
- * concurrent tile burst, exhausts PHP-FPM and takes the whole site down. The client overzooms past our
- * native maxzoom (maxNativeZoom), so soft watercolour stays painterly when zoomed in.
+ * concurrent tile burst, exhausts PHP-FPM and takes the whole site down.
+ *
+ * maxZoom is pinned to our native maxzoom (== maxNativeZoom), i.e. overzoom is forbidden. When Leaflet
+ * upscales tiles past native it positions the enlarged tiles on fractional pixels, leaving ~1px gaps
+ * that the transparent map pane shows through as thin white seams between tiles. Since the federation
+ * map takes its own maxZoom from the base layer (map.js sets none), capping the layer here caps the
+ * whole map, so Leaflet never upscales and the seams cannot form. Trade-off: the map cannot zoom in
+ * past z{maxzoom}; deep marker declustering is limited to that. Raising it needs higher native tiles.
  */
 add_filter('murmfed_base_tilelayer', function ($default) {
     // An explicit admin "Base map tiles" setting wins; only auto-supply when nothing is configured.
@@ -182,10 +188,11 @@ add_filter('murmfed_base_tilelayer', function ($default) {
     if (! is_file($tiles_dir . '/0/0/0.png')) { return $default; }   // not extracted yet -> OSM
     $base = trailingslashit(wp_upload_dir()['baseurl']) . 'permatiles/tiles';
     $ver = (string) @filemtime($tiles_dir . '/0/0/0.png');           // cache-bust when rebuilt
+    $mz  = (int) $manifest->maxzoom();
     return [
         'url'           => $base . '/{z}/{x}/{y}.png?v=' . $ver,
-        'maxNativeZoom' => (int) $manifest->maxzoom(),
-        'maxZoom'       => 19,
+        'maxNativeZoom' => $mz,
+        'maxZoom'       => $mz,   // pinned to native: forbid overzoom -> no white tile seams
         'attribution'   => $manifest->attribution() ?: 'Natural Earth',
     ];
 });
