@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Permatiles
  * Description: Serves the self-hosted watercolour basemap (PMTiles) for the perma.earth global map.
- * Version: 0.1.1
+ * Version: 0.1.2
  * Requires PHP: 7.4
  */
 
@@ -10,7 +10,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('PERMATILES_VERSION', '0.1.1');
+define('PERMATILES_VERSION', '0.1.2');
 define('PERMATILES_DIR', plugin_dir_path(__FILE__));
 define('PERMATILES_DATA_DIR', trailingslashit(wp_upload_dir()['basedir']) . 'permatiles');
 
@@ -19,6 +19,7 @@ require_once PERMATILES_DIR . 'includes/class-manifest.php';
 require_once PERMATILES_DIR . 'includes/class-rate-limiter.php';
 require_once PERMATILES_DIR . 'includes/class-tile-endpoint.php';
 require_once PERMATILES_DIR . 'includes/class-updater.php';
+require_once PERMATILES_DIR . 'includes/class-extractor.php';
 require_once PERMATILES_DIR . 'includes/class-admin.php';
 
 /** Settings with defaults. */
@@ -113,17 +114,29 @@ add_action('admin_post_permatiles_pull', function () {
     $updater = new Permatiles_Updater($s['repo'], PERMATILES_DATA_DIR);
     wp_mkdir_p(PERMATILES_DATA_DIR);
     $r = $updater->pull();
+    if ($r['ok']) { $r['extracted'] = Permatiles_Extractor::run(PERMATILES_DATA_DIR); }
     set_transient('permatiles_last_pull', $r, 600);
     wp_safe_redirect(admin_url('options-general.php?page=permatiles&pulled=' . ($r['ok'] ? '1' : '0')));
     exit;
 });
 
 if (defined('WP_CLI') && WP_CLI) {
+    // Pull the latest release, then expand it into the static tile pyramid the map actually serves.
     WP_CLI::add_command('permatiles pull', function () {
         $s = permatiles_settings();
         wp_mkdir_p(PERMATILES_DATA_DIR);
         $r = (new Permatiles_Updater($s['repo'], PERMATILES_DATA_DIR))->pull();
-        if ($r['ok']) { WP_CLI::success($r['message']); } else { WP_CLI::error($r['message']); }
+        if (! $r['ok']) { WP_CLI::error($r['message']); }
+        WP_CLI::log($r['message']);
+        $e = Permatiles_Extractor::run(PERMATILES_DATA_DIR);
+        WP_CLI::success($e ? "extracted {$e['tiles']} land + {$e['ocean']} ocean tiles" : 'pulled (no extract)');
+    });
+
+    // Re-expand the static pyramid from files already on disk (no re-download).
+    WP_CLI::add_command('permatiles extract', function () {
+        $e = Permatiles_Extractor::run(PERMATILES_DATA_DIR);
+        if ($e === null) { WP_CLI::error('no manifest to extract'); }
+        WP_CLI::success("extracted {$e['tiles']} land + {$e['ocean']} ocean tiles");
     });
 }
 
@@ -133,8 +146,12 @@ if (is_admin()) {
 
 /**
  * Feed the watercolour basemap to the federation map's filterable base layer. Only when enabled and
- * tiles are installed; otherwise the federation map falls back to OpenStreetMap. The client overzooms
- * past our native maxzoom (maxNativeZoom), so soft watercolour stays painterly when zoomed in.
+ * the STATIC tile pyramid has been extracted; otherwise the federation map falls back to OpenStreetMap.
+ *
+ * Serves the pre-extracted tiles straight from uploads/ (nginx, no PHP per tile) — NOT the PHP
+ * /permatiles/ endpoint, which boots all of WordPress per request (~1.5s) and, under a map view's
+ * concurrent tile burst, exhausts PHP-FPM and takes the whole site down. The client overzooms past our
+ * native maxzoom (maxNativeZoom), so soft watercolour stays painterly when zoomed in.
  */
 add_filter('murmfed_base_tilelayer', function ($default) {
     // An explicit admin "Base map tiles" setting wins; only auto-supply when nothing is configured.
@@ -143,8 +160,12 @@ add_filter('murmfed_base_tilelayer', function ($default) {
     if (empty($s['enabled'])) { return $default; }
     $manifest = new Permatiles_Manifest(PERMATILES_DATA_DIR);
     if (! $manifest->exists()) { return $default; }
+    $tiles_dir = PERMATILES_DATA_DIR . '/tiles';
+    if (! is_file($tiles_dir . '/0/0/0.png')) { return $default; }   // not extracted yet -> OSM
+    $base = trailingslashit(wp_upload_dir()['baseurl']) . 'permatiles/tiles';
+    $ver = (string) @filemtime($tiles_dir . '/0/0/0.png');           // cache-bust when rebuilt
     return [
-        'url'           => home_url('/permatiles/{z}/{x}/{y}.png'),
+        'url'           => $base . '/{z}/{x}/{y}.png?v=' . $ver,
         'maxNativeZoom' => (int) $manifest->maxzoom(),
         'maxZoom'       => 19,
         'attribution'   => $manifest->attribution() ?: 'Natural Earth',
