@@ -3,7 +3,7 @@ import os
 import tomllib
 from . import data, tiles, pack
 from .palette import Palette
-from .textures import fractal_noise
+from .textures import fractal_noise, granulation, load_swatch
 from .prune import shared_ocean_tile
 from .quantise import to_png8
 
@@ -15,28 +15,43 @@ def build_textures(cfg: dict) -> dict:
     # Ocean is a single 256px tile reused everywhere, so its contrast is compressed toward the mean
     # (ocean_contrast < 1) to keep the unavoidable tile repetition too subtle to read as a pattern,
     # while staying perfectly seamless.
-    ocean = fractal_noise(256, cfg["ocean_cells"], cfg["ocean_octaves"], cfg["seed"] + 100)
+    seed = cfg["seed"]
+    ocean = fractal_noise(256, cfg["ocean_cells"], cfg["ocean_octaves"], seed + 100)
     k = cfg.get("ocean_contrast", 1.0)
     ocean = 0.5 + (ocean - 0.5) * k
+    tsize = cfg["paper_tex_size"]
+    tx = cfg.get("textures", {})
+    def swatch_or(key, fallback):
+        path = tx.get(key)
+        return load_swatch(path, tsize) if path else fallback
     return {
-        "paper": fractal_noise(cfg["paper_tex_size"], cfg["paper_cells"], cfg["paper_octaves"], cfg["seed"]),
+        "paper": swatch_or("paper", fractal_noise(tsize, cfg["paper_cells"], cfg["paper_octaves"], seed)),
         "ocean": ocean,
+        "granulation": swatch_or("granulation", granulation(tsize, seed + 5)),
+        "disp_x": fractal_noise(tsize, 8, 4, seed + 991),
+        "disp_y": fractal_noise(tsize, 8, 4, seed + 613),
+        "speckle": fractal_noise(256, 64, 1, seed + 300),
     }
+
+def render_opts(cfg: dict) -> dict:
+    return dict(cfg.get("render", {}))
 
 def cmd_render(cfg: dict):
     gd = data.load(cfg["data_dir"])
     tex = build_textures(cfg)
     pal = Palette.from_dict(cfg["palette"])
+    opts = render_opts(cfg)
     os.makedirs(cfg["out_dir"], exist_ok=True)
     workers = cfg.get("workers", 1)
     for z in range(cfg["zoom_min"], cfg["zoom_max"] + 1):
         if workers > 1 and z >= 4:
             print(tiles.render_zoom_parallel(z, gd, tex, pal, cfg["out_dir"], cfg["pad"],
-                                             cfg["tile_size"], workers))
+                                             cfg["tile_size"], workers, opts=opts))
         else:
-            print(tiles.render_zoom(z, gd, tex, pal, cfg["out_dir"], cfg["pad"], cfg["tile_size"]))
+            print(tiles.render_zoom(z, gd, tex, pal, cfg["out_dir"], cfg["pad"], cfg["tile_size"],
+                                    opts=opts))
     with open(os.path.join(cfg["out_dir"], "ocean.png"), "wb") as f:
-        f.write(to_png8(shared_ocean_tile(pal, tex, cfg["pad"], cfg["tile_size"])))
+        f.write(to_png8(shared_ocean_tile(pal, tex, cfg["pad"], cfg["tile_size"], opts=opts)))
 
 def cmd_pack(cfg: dict):
     out = cfg["out_dir"]

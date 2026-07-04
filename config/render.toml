@@ -17,6 +17,25 @@ ocean_cells = 8
 ocean_octaves = 3
 ocean_contrast = 0.4
 
+[render]
+coast_sigma = 1.6
+disp_amp = 0.9
+edge_px = 6.0
+edge_strength = 0.5
+river_px = 1
+river_alpha = 0.22
+speckle_alpha = 0.0
+speckle_thresh = 0.985
+lake_min_zoom = 4
+river_min_zoom = 6
+min_area_px = 3.0
+coast_all_touched = true
+
+# Optional real watercolour swatches (built by scripts/make_swatches.py). Absent => procedural.
+[textures]
+# paper = "assets/textures/paper.png"
+# granulation = "assets/textures/granulation.png"
+
 # Palette sampled from the perma.earth footer watercolour (ILUSTRA-12-HOME.jpg):
 # sage-green living land, warm peach arid earth, soft teal sea, cream paper. Coral accent reserved.
 [palette]

@@ -13,5 +13,11 @@ def main():
         r, g, b = pal[idx * 3: idx * 3 + 3]
         print(f"#{r:02x}{g:02x}{b:02x}")
 
+    from permatiles.palette import darker, hex_to_rgb
+    print("# derived in-hue edge tones (deeper same-hue):")
+    for name, hexv in [("land", "#a9b89a"), ("arid", "#e9c39c"), ("sea", "#8fc6c0")]:
+        r, g, b = darker(hex_to_rgb(hexv))
+        print(f"#   {name}_edge = #{r:02x}{g:02x}{b:02x}")
+
 if __name__ == "__main__":
     main()
