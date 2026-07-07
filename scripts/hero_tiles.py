@@ -7,6 +7,7 @@ Renders FROM cli.build_textures(cfg) (not a hand-built fixture), so it doubles a
 build_textures -> render_tile integration smoke.
 """
 import io
+import math
 import sys
 from PIL import Image, ImageDraw
 from permatiles import cli, data, tiles, geo
@@ -19,6 +20,7 @@ REGIONS = [
     ("Great Lakes",    -83.0, 44.0),    # inland lakes
     ("Open Pacific",  -140.0, -10.0),   # open ocean (shared tile)
     ("Sahel edge",       6.0, 15.5),    # peach desert -> sage vegetation transition
+    ("Central Australia", 133.0, -25.0),   # interior must read as arid, not blotches
 ]
 
 
@@ -38,7 +40,8 @@ def main():
     opts = cli.render_opts(cfg)
     pal = Palette.from_dict(cfg["palette"])
     size = cfg["tile_size"]
-    cols, rows = 3, 2
+    cols = 3
+    rows = math.ceil(len(REGIONS) / cols)
     lab = 20
     sheet = Image.new("RGB", (cols * size, rows * (size + lab)), "white")
     draw = ImageDraw.Draw(sheet)
