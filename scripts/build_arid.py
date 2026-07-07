@@ -14,11 +14,30 @@ import rasterio
 from rasterio.features import shapes
 import geopandas as gpd
 from shapely.geometry import shape
+from shapely.ops import unary_union
 
 ARID_CLASSES = (4, 5, 6, 7)
 
 def arid_class_mask(grid: np.ndarray) -> np.ndarray:
     return np.isin(grid, ARID_CLASSES)
+
+
+def decimation_factor(native_deg: float, target_deg: float) -> int:
+    """Integer read-decimation so the raster grid is ~target_deg. Never upsamples a coarse raster."""
+    return max(1, round(target_deg / native_deg))
+
+
+def drop_specks(geom, min_area_deg2: float):
+    """Remove sub-polygons smaller than min_area_deg2 (CRS units^2). Returns a (Multi)Polygon."""
+    parts = list(geom.geoms) if geom.geom_type.startswith("Multi") else [geom]
+    kept = [p for p in parts if p.area >= min_area_deg2]
+    return unary_union(kept) if kept else geom
+
+
+def clean(geom, clean_deg: float, simplify_deg: float, min_area_deg2: float):
+    """Symmetric close (fill hairline gaps/holes, no net grow/shrink) -> drop specks -> light simplify."""
+    closed = geom.buffer(clean_deg).buffer(-clean_deg)
+    return drop_specks(closed, min_area_deg2).simplify(simplify_deg)
 
 def build(tif_path: str, out_path: str, simplify_deg: float = 0.4, smooth_deg: float = 0.5):
     with rasterio.open(tif_path) as src:
