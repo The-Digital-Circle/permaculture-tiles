@@ -1,7 +1,13 @@
 .venv/
 __pycache__/
 *.pyc
-/data/
+# Ignore data/ CONTENTS (downloadable Natural Earth zips, Köppen raster) — but /data/* form
+# (not /data/) so the one curated, committed build artifact below can be re-included. A
+# directory-form `/data/` exclusion would make the negation inert (git won't recurse into it).
+/data/*
+# The curated Köppen aridity mask IS committed & tested (small; keeps tile builds reproducible
+# without re-downloading the 68MB raster).
+!/data/arid.geojson
 /build/
 /assets/reference/
 
