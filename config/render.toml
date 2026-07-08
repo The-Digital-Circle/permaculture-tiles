@@ -56,7 +56,7 @@ coast_all_touched = true
 # sage-green living land, warm peach arid earth, soft teal sea, cream paper. Coral accent reserved.
 [palette]
 land    = "#b7caa8"
-arid    = "#f9c9a6"
+arid    = "#b7caa8"    # NO-DESERT variant: arid wash matched to land, so the two-tone blend resolves to uniform sage-green land (deserts render green)
 sea     = "#80c4ba"
 lake    = "#9fd5c8"
 river   = "#93c6bf"
