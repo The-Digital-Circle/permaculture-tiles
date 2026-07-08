@@ -1,3 +1,6 @@
+import os
+
+import geopandas as gpd
 import numpy as np
 import pytest
 from shapely.geometry import box, MultiPolygon
@@ -35,10 +38,6 @@ def test_clean_drops_specks_and_preserves_extent():
     assert out.bounds == pytest.approx((0, 0, 10, 10), abs=0.02)
 
 
-import os
-import geopandas as gpd
-
-
 def _arid_area_in_box(geom, w, s, e, n):
     return geom.intersection(box(w, s, e, n)).area
 
@@ -49,7 +48,7 @@ def test_arid_geojson_covers_australia_and_sahara():
     geom = g.geometry.union_all() if hasattr(g.geometry, "union_all") else g.geometry.unary_union
     parts = list(geom.geoms) if geom.geom_type.startswith("Multi") else [geom]
     # Australia interior must read as predominantly arid. Natural-Earth named deserts gave ~75 deg^2
-    # (the "yellow blotches" bug); the Köppen climate mask gives ~450. Primary regression guard.
+    # (the "yellow blotches" bug); the Köppen climate mask gives ~560. Primary regression guard.
     assert _arid_area_in_box(geom, 112, -39, 154, -10) >= 250
     # Saharan/Sahel belt at full extent.
     assert _arid_area_in_box(geom, -17, 15, 37, 31) >= 700

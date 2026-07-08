@@ -28,7 +28,8 @@ def arid_class_mask(grid: np.ndarray) -> np.ndarray:
 
 
 def decimation_factor(native_deg: float, target_deg: float) -> int:
-    """Integer read-decimation so the raster grid is ~target_deg. Never upsamples a coarse raster."""
+    """Integer read-decimation so the raster grid is ~target_deg (one factor for both axes, assuming
+    square pixels — true for the Beck_KG geographic raster). Never upsamples a coarse raster."""
     return max(1, round(target_deg / native_deg))
 
 
@@ -40,7 +41,8 @@ def drop_specks(geom, min_area_deg2: float):
 
 
 def clean(geom, clean_deg: float, simplify_deg: float, min_area_deg2: float):
-    """Symmetric close (fill hairline gaps/holes, no net grow/shrink) -> drop specks -> light simplify."""
+    """Symmetric close (merge blobs, fill hairline gaps/holes; no asymmetric offset, unlike the old
+    +0.5/-0.35 buffer) -> drop specks -> light simplify."""
     closed = geom.buffer(clean_deg).buffer(-clean_deg)
     return drop_specks(closed, min_area_deg2).simplify(simplify_deg)
 
