@@ -38,6 +38,21 @@ def test_lakes_and_rivers_gated_below_min_zoom(synthetic_geodata):
     assert not m["lake"].any()
     assert not m["river"].any()
 
+def test_urban_off_by_default_but_drawn_when_enabled(synthetic_geodata):
+    # Built-up areas are off since v0.2.5: painted coral they read as an unexplained orange speckle.
+    # Assert BOTH directions on the same tile -- an "is empty" assertion alone would still pass if the
+    # urban mask were broken outright, which would hide the flag doing nothing.
+    from permatiles import tiles as T, geo
+    z = 6                                                # >= urban_min_zoom (5): only the flag gates
+    cx3, cy3 = geo.ORIGIN * 0.65, geo.ORIGIN * 0.15      # centroid of the fixture urban box
+    span = geo.tile_span_m(z)
+    x = int((cx3 + geo.ORIGIN) / span)
+    y = int((geo.ORIGIN - cy3) / span)
+    off = T.build_masks(z, x, y, synthetic_geodata, pad=24, size=256, opts=None)
+    on = T.build_masks(z, x, y, synthetic_geodata, pad=24, size=256, opts={"draw_urban": True})
+    assert not off["urban"].any()      # default: no cities
+    assert on["urban"].any()           # flag flips them back, so the tile really does contain urban
+
 def test_lakes_present_at_high_zoom(synthetic_geodata):
     # a z6 tile covering the synthetic lake's centroid actually draws lake pixels (gate open at z>=4)
     from permatiles import tiles as T, geo

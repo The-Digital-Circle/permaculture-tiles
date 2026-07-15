@@ -13,15 +13,17 @@ def _padded_bounds(z, x, y, pad, size):
     return (minx - m, miny - m, maxx + m, maxy + m)
 
 _DEFAULT_MASK_OPTS = {"lake_min_zoom": 4, "river_min_zoom": 6, "urban_min_zoom": 5,
-                      "draw_rivers": False, "min_area_px": 3.0, "coast_all_touched": True}
+                      "draw_rivers": False, "draw_urban": False,
+                      "min_area_px": 3.0, "coast_all_touched": True}
 
 def build_masks(z, x, y, geodata, pad, size, opts=None):
     """Build the {land, arid, lake, river, urban} boolean mask dict (P,P) for one tile, P = size+2*pad.
 
     Lakes are zeroed below opts['lake_min_zoom'] (default 4), rivers below opts['river_min_zoom']
     (default 6) and urban footprints below opts['urban_min_zoom'] (default 5), so inland detail stops
-    cluttering low-zoom tiles. Sub-pixel features are dropped via min_area_px (does not apply to
-    line-geometry rivers, which have zero area)."""
+    cluttering low-zoom tiles. Rivers and urban areas are additionally off entirely unless
+    opts['draw_rivers'] / opts['draw_urban'] are set. Sub-pixel features are dropped via min_area_px
+    (does not apply to line-geometry rivers, which have zero area)."""
     o = {**_DEFAULT_MASK_OPTS, **(opts or {})}
     P = size + 2 * pad
     pb = _padded_bounds(z, x, y, pad, size)
@@ -36,7 +38,9 @@ def build_masks(z, x, y, geodata, pad, size, opts=None):
     # waters (Thames/Severn/St Lawrence estuaries) already render as sea through the coastline.
     river = rasterise(clip_geoms(geodata.rivers, pb), pb, P, P, all_touched=False, min_area_px=0.0) \
             if o["draw_rivers"] and z >= o["river_min_zoom"] else zeros.copy()
-    urban = m(geodata.urban) if getattr(geodata, "urban", None) is not None \
+    # Built-up areas painted coral read as an unexplained orange speckle: a basemap has no legend, so
+    # viewers asked what they meant. Off by default; flip draw_urban to bring the cities back.
+    urban = m(geodata.urban) if o["draw_urban"] and getattr(geodata, "urban", None) is not None \
             and z >= o["urban_min_zoom"] else zeros.copy()
     return {"land": land, "arid": arid, "lake": lake, "river": river, "urban": urban}
 

@@ -48,7 +48,11 @@ speckle_thresh = 0.984
 lake_min_zoom = 4
 draw_rivers = false     # thin river centerlines look bad; wide estuaries come from the coastline
 river_min_zoom = 6
-urban_min_zoom = 5      # paint built-up areas coral from this zoom up (specks below it)
+# Built-up areas read as an unexplained orange speckle -- a basemap has no legend, so viewers asked
+# what they meant (the same question that killed the peach deserts). Off since v0.2.5; the data and
+# palette entry are kept, so flipping this back brings the coral cities in again.
+draw_urban = false
+urban_min_zoom = 5      # zoom from which urban would paint, when draw_urban is on
 min_area_px = 3.0
 coast_all_touched = true
 
