@@ -55,6 +55,12 @@ draw_urban = false
 urban_min_zoom = 5      # zoom from which urban would paint, when draw_urban is on
 min_area_px = 3.0
 coast_all_touched = true
+# Tiles ship as WebP q90: PNG8 costs ~60 KB/tile because the paper grain is per-pixel high-entropy
+# noise, and lossless WebP only claws back 3% of that (it wins by predicting structure; noise has
+# none). q90 is -82% and keeps 87-92% of the grain's contrast. Do NOT lower it -- q85 drops to 71%
+# and q80 to 24%, where granulation reads as DCT blocking. Set tile_format = "png" to revert.
+tile_format = "webp"
+webp_quality = 90
 
 # Palette sampled from the perma.earth footer watercolour (ILUSTRA-12-HOME.jpg):
 # sage-green living land, warm peach arid earth, soft teal sea, cream paper. Coral accent reserved.

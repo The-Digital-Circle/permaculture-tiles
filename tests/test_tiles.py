@@ -63,3 +63,20 @@ def test_lakes_present_at_high_zoom(synthetic_geodata):
     y = int((geo.ORIGIN - cy3) / span)
     m = T.build_masks(z, x, y, synthetic_geodata, pad=24, size=256, opts=None)
     assert m["lake"].any()          # real assertion: lake is present, not gated away
+
+def test_render_tile_honours_tile_format(synthetic_geodata):
+    # Both directions on one tile. An "is webp" assertion alone would still pass with the flag
+    # ignored if the default happened to change, so pin png too.
+    args = (6, 40, 30, synthetic_geodata, _tex(), PAL)
+    kw = dict(pad=24, size=256)
+    png = tiles.render_tile(*args, **kw, opts=None)
+    webp = tiles.render_tile(*args, **kw, opts={"tile_format": "webp", "webp_quality": 90})
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    assert webp[:4] == b"RIFF" and webp[8:12] == b"WEBP"
+    assert len(webp) < len(png)
+
+def test_render_zoom_writes_the_configured_extension(tmp_path, synthetic_geodata):
+    tiles.render_zoom(1, synthetic_geodata, _tex(), PAL, str(tmp_path), pad=24, size=256,
+                      opts={"tile_format": "webp", "webp_quality": 90})
+    assert os.path.exists(tmp_path / "1" / "1" / "0.webp")
+    assert not os.path.exists(tmp_path / "1" / "1" / "0.png")

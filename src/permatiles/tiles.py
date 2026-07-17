@@ -5,7 +5,7 @@ from . import geo
 from .masks import rasterise, clip_geoms
 from .watercolour import render_padded
 from .prune import is_pure_ocean
-from .quantise import to_png8
+from .quantise import encode, ext_for
 
 def _padded_bounds(z, x, y, pad, size):
     minx, miny, maxx, maxy = geo.tile_bounds_3857(z, x, y)
@@ -15,6 +15,13 @@ def _padded_bounds(z, x, y, pad, size):
 _DEFAULT_MASK_OPTS = {"lake_min_zoom": 4, "river_min_zoom": 6, "urban_min_zoom": 5,
                       "draw_rivers": False, "draw_urban": False,
                       "min_area_px": 3.0, "coast_all_touched": True}
+
+def _encoding(opts):
+    """(format, quality, ext) for a render. Defaults to png: callers passing no opts keep v0.2.5
+    behaviour byte-for-byte."""
+    o = opts or {}
+    fmt = o.get("tile_format", "png")
+    return fmt, int(o.get("webp_quality", 90)), ext_for(fmt)
 
 def build_masks(z, x, y, geodata, pad, size, opts=None):
     """Build the {land, arid, lake, river, urban} boolean mask dict (P,P) for one tile, P = size+2*pad.
@@ -45,13 +52,16 @@ def build_masks(z, x, y, geodata, pad, size, opts=None):
     return {"land": land, "arid": arid, "lake": lake, "river": river, "urban": urban}
 
 def render_tile(z, x, y, geodata, textures, palette, pad, size, opts=None):
-    """Render one tile to PNG8 bytes, or None if it is pure open ocean (pruned)."""
+    """Render one tile to encoded bytes in opts['tile_format'] (default png), or None if it is pure
+    open ocean (pruned)."""
     masks = build_masks(z, x, y, geodata, pad, size, opts)
     centre = {k: v[pad:pad + size, pad:pad + size] for k, v in masks.items()}
     if is_pure_ocean(centre):
         return None
+    fmt, quality, _ = _encoding(opts)
     gx0, gy0 = geo.world_px_origin(z, x, y)
-    return to_png8(render_padded(masks, palette, textures, gx0, gy0, pad, size, opts=opts))
+    return encode(render_padded(masks, palette, textures, gx0, gy0, pad, size, opts=opts),
+                  fmt, quality)
 
 def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bbox_tiles=None,
                 opts=None):
@@ -60,16 +70,17 @@ def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bb
     n = geo.num_tiles(z)
     x0, y0, x1, y1 = bbox_tiles or (0, 0, n - 1, n - 1)
     written = pruned = 0
+    ext = _encoding(opts)[2]
     for x in range(x0, x1 + 1):
         for y in range(y0, y1 + 1):
-            png = render_tile(z, x, y, geodata, textures, palette, pad, size, opts)
-            if png is None:
+            data = render_tile(z, x, y, geodata, textures, palette, pad, size, opts)
+            if data is None:
                 pruned += 1
                 continue
             d = os.path.join(out_dir, str(z), str(x))
             os.makedirs(d, exist_ok=True)
-            with open(os.path.join(d, f"{y}.png"), "wb") as f:
-                f.write(png)
+            with open(os.path.join(d, f"{y}.{ext}"), "wb") as f:
+                f.write(data)
             written += 1
     return {"zoom": z, "written": written, "pruned": pruned}
 
@@ -81,24 +92,25 @@ def _init_worker(geodata, textures, palette, pad, size, opts=None):
 
 def _render_one(args):
     z, x, y = args
-    png = render_tile(z, x, y, _CTX["geodata"], _CTX["textures"], _CTX["palette"],
-                      _CTX["pad"], _CTX["size"], _CTX.get("opts"))
-    return (z, x, y, png)
+    data = render_tile(z, x, y, _CTX["geodata"], _CTX["textures"], _CTX["palette"],
+                       _CTX["pad"], _CTX["size"], _CTX.get("opts"))
+    return (z, x, y, data)
 
 def render_zoom_parallel(z, geodata, textures, palette, out_dir, pad, size, workers, opts=None):
     """Same as render_zoom but fans tiles across a process pool. Used for the big zooms (z>=4)."""
     n = geo.num_tiles(z)
     jobs = [(z, x, y) for x in range(n) for y in range(n)]
     written = pruned = 0
+    ext = _encoding(opts)[2]
     with ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
                              initargs=(geodata, textures, palette, pad, size, opts)) as ex:
-        for z_, x, y, png in ex.map(_render_one, jobs, chunksize=16):
-            if png is None:
+        for z_, x, y, data in ex.map(_render_one, jobs, chunksize=16):
+            if data is None:
                 pruned += 1
                 continue
             d = os.path.join(out_dir, str(z_), str(x))
             os.makedirs(d, exist_ok=True)
-            with open(os.path.join(d, f"{y}.png"), "wb") as f:
-                f.write(png)
+            with open(os.path.join(d, f"{y}.{ext}"), "wb") as f:
+                f.write(data)
             written += 1
     return {"zoom": z, "written": written, "pruned": pruned}
