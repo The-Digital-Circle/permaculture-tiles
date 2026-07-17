@@ -33,15 +33,16 @@ class Permatiles_Tile_Endpoint {
         if ($z < 0 || $z > $this->manifest->maxzoom()) {
             return ['status' => 404, 'content_type' => 'text/plain', 'body' => null, 'source' => 'none'];
         }
+        $ct = 'image/' . $this->manifest->tile_format();
         $file = $this->manifest->file_for($z, $x, $y);
         $tile = $file ? $this->reader($file)->get_tile($z, $x, $y) : null;
         if ($tile !== null) {
-            return ['status' => 200, 'content_type' => 'image/png', 'body' => $tile, 'source' => 'tile'];
+            return ['status' => 200, 'content_type' => $ct, 'body' => $tile, 'source' => 'tile'];
         }
         // pruned / absent -> the single shared open-water tile
         $ocean = @file_get_contents($this->ocean_path);
         if ($ocean !== false) {
-            return ['status' => 200, 'content_type' => 'image/png', 'body' => $ocean, 'source' => 'ocean'];
+            return ['status' => 200, 'content_type' => $ct, 'body' => $ocean, 'source' => 'ocean'];
         }
         return ['status' => 404, 'content_type' => 'text/plain', 'body' => null, 'source' => 'none'];
     }

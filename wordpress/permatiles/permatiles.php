@@ -40,7 +40,7 @@ class Permatiles_Transient_Store implements Permatiles_Store {
 }
 
 add_action('init', function () {
-    add_rewrite_rule('^permatiles/(\d+)/(\d+)/(\d+)\.png$',
+    add_rewrite_rule('^permatiles/(\d+)/(\d+)/(\d+)\.(?:png|webp)$',
         'index.php?permatiles_z=$matches[1]&permatiles_x=$matches[2]&permatiles_y=$matches[3]', 'top');
 });
 
@@ -129,8 +129,9 @@ add_action('admin_post_permatiles_pull', function () {
  * never drop the source when there is nothing to fall back to.
  */
 function permatiles_drop_source() {
-    if (! is_file(PERMATILES_DATA_DIR . '/tiles/0/0/0.png')) { return 0; }
     $manifest = new Permatiles_Manifest(PERMATILES_DATA_DIR);
+    $ext = $manifest->tile_format();
+    if (! is_file(PERMATILES_DATA_DIR . '/tiles/0/0/0.' . $ext)) { return 0; }
     $n = 0;
     foreach ($manifest->tile_files() as $f) { if (@unlink($f)) { $n++; } }
     return $n;
@@ -185,14 +186,18 @@ add_filter('murmfed_base_tilelayer', function ($default) {
     $manifest = new Permatiles_Manifest(PERMATILES_DATA_DIR);
     if (! $manifest->exists()) { return $default; }
     $tiles_dir = PERMATILES_DATA_DIR . '/tiles';
-    if (! is_file($tiles_dir . '/0/0/0.png')) { return $default; }   // not extracted yet -> OSM
+    $ext = $manifest->tile_format();
+    if (! is_file($tiles_dir . '/0/0/0.' . $ext)) { return $default; }   // not extracted yet -> OSM
     $base = trailingslashit(wp_upload_dir()['baseurl']) . 'permatiles/tiles';
-    $ver = (string) @filemtime($tiles_dir . '/0/0/0.png');           // cache-bust when rebuilt
+    $ver = (string) @filemtime($tiles_dir . '/0/0/0.' . $ext);           // cache-bust when rebuilt
     $mz  = (int) $manifest->maxzoom();
     return [
-        'url'           => $base . '/{z}/{x}/{y}.png?v=' . $ver,
+        'url'           => $base . '/{z}/{x}/{y}.' . $ext . '?v=' . $ver,
         'maxNativeZoom' => $mz,
         'maxZoom'       => $mz,   // pinned to native: forbid overzoom -> no white tile seams
         'attribution'   => $manifest->attribution() ?: 'Natural Earth',
+        // Lets the map fall back to OSM where WebP cannot be decoded (Safari <14). Passed straight
+        // through to JS by wp_localize_script -- the federation side whitelists no keys.
+        'format'        => $ext,
     ];
 });

@@ -2,13 +2,16 @@
 use PHPUnit\Framework\TestCase;
 
 class EndpointTest extends TestCase {
-    private function endpoint() {
-        $manifest = new Permatiles_Manifest(__DIR__ . '/fixtures');   // routes z0-6 -> file A
-        // reader factory returns a fake reader keyed by file
+    private function endpoint($format = 'png') {
+        $manifest = new class($format) {
+            private $format;
+            public function __construct($format) { $this->format = $format; }
+            public function maxzoom() { return 5; }
+            public function tile_format() { return $this->format; }
+            public function file_for($z, $x, $y) { return 'band.pmtiles'; }
+        };
         $factory = function ($file) {
-            return new class($file) {
-                public $file;
-                public function __construct($f) { $this->file = $f; }
+            return new class {
                 public function get_tile($z, $x, $y) {
                     return ($z === 3 && $x === 1 && $y === 1) ? 'PNGDATA' : null;
                 }
@@ -33,5 +36,12 @@ class EndpointTest extends TestCase {
     public function test_out_of_range_zoom_is_404() {
         $r = $this->endpoint()->resolve(20, 0, 0);
         $this->assertSame(404, $r['status']);
+    }
+
+    public function test_content_type_follows_the_tile_format() {
+        $r = $this->endpoint('webp')->resolve(3, 1, 1);
+        $this->assertSame('image/webp', $r['content_type']);
+        $this->assertSame('image/webp', $this->endpoint('webp')->resolve(0, 0, 0)['content_type']);  // ocean
+        $this->assertSame('image/png', $this->endpoint('png')->resolve(3, 1, 1)['content_type']);
     }
 }
