@@ -79,4 +79,13 @@ class ExtractorTest extends TestCase {
         $this->assertStringContainsString('missing source', $r['message']);
         $this->assertSame('DDD', file_get_contents("$this->dest/tiles/2/2/1.png"));   // tree intact
     }
+
+    public function test_extract_writes_the_given_extension() {
+        $ocean = __DIR__ . '/fixtures/ocean.png';
+        $resolve = function ($z, $x, $y) { return ($z === 0) ? 'AAA' : null; };
+        Permatiles_Extractor::extract(1, $resolve, $ocean, $this->dest, 'webp');
+        $this->assertSame('AAA', file_get_contents("$this->dest/0/0/0.webp"));
+        $this->assertFileDoesNotExist("$this->dest/0/0/0.png");
+        $this->assertFileExists("$this->dest/1/0/1.webp");           // ocean position, hard-linked
+    }
 }

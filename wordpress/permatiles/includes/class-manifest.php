@@ -36,6 +36,16 @@ class Permatiles_Manifest {
         return $this->dir . '/' . $name;
     }
 
+    /**
+     * Tile image format: 'png' or 'webp'. Absent means 'png' — that is the rollback path to any
+     * release before v0.2.6, which shipped no tile_format key. Anything unrecognised also means
+     * 'png': the value becomes a file extension, so it is never taken on trust.
+     */
+    public function tile_format() {
+        $f = (string) ($this->data()['tile_format'] ?? 'png');
+        return in_array($f, ['png', 'webp'], true) ? $f : 'png';
+    }
+
     /** Absolute paths of every PMTiles file named in the manifest (the extraction source set). */
     public function tile_files() {
         $out = [];

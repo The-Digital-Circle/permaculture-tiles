@@ -2,7 +2,7 @@
 if (! defined('ABSPATH')) { exit; }
 
 /**
- * Expands a PMTiles set into a STATIC tile pyramid ($dir/{z}/{x}/{y}.png) that the web server serves
+ * Expands a PMTiles set into a STATIC tile pyramid ($dir/{z}/{x}/{y}.{ext}) that the web server serves
  * directly, with no PHP per request. This is what keeps the map from taking the site down: serving a
  * tile through WordPress boots the whole stack (~1.5s/tile) and a single map view fires dozens at once,
  * exhausting PHP-FPM. Static files are served by nginx in ~1ms with unbounded concurrency.
@@ -15,12 +15,13 @@ class Permatiles_Extractor {
 
     /**
      * @param int      $maxzoom   inclusive top zoom to materialise
-     * @param callable $resolve   fn($z,$x,$y) => raw PNG bytes, or null for open ocean
-     * @param string   $ocean     path to the shared ocean PNG (used for every absent position)
+     * @param callable $resolve   fn($z,$x,$y) => raw encoded tile bytes, or null for open ocean
+     * @param string   $ocean     path to the shared ocean tile (used for every absent position)
      * @param string   $tiles_dir destination root (wiped and rebuilt)
+     * @param string   $ext       tile extension from the manifest ('png'|'webp')
      * @return array{tiles:int, ocean:int}
      */
-    public static function extract($maxzoom, callable $resolve, $ocean, $tiles_dir) {
+    public static function extract($maxzoom, callable $resolve, $ocean, $tiles_dir, $ext = 'png') {
         self::rrmdir($tiles_dir);
         if (! wp_mkdir_p($tiles_dir)) { return ['tiles' => 0, 'ocean' => 0]; }
         $land = 0; $sea = 0;
@@ -30,10 +31,10 @@ class Permatiles_Extractor {
                 $xdir = "$tiles_dir/$z/$x";
                 wp_mkdir_p($xdir);
                 for ($y = 0; $y < $n; $y++) {
-                    $path = "$xdir/$y.png";
-                    $png = $resolve($z, $x, $y);
-                    if ($png !== null && $png !== false && $png !== '') {
-                        file_put_contents($path, $png);
+                    $path = "$xdir/$y.$ext";
+                    $tile = $resolve($z, $x, $y);
+                    if ($tile !== null && $tile !== false && $tile !== '') {
+                        file_put_contents($path, $tile);
                         $land++;
                     } else {
                         // hard-link the one ocean tile into every open-water position (copy fallback)
@@ -80,7 +81,8 @@ class Permatiles_Extractor {
             return $readers[$file]->get_tile($z, $x, $y);
         };
         $counts = self::extract((int) $manifest->maxzoom(), $resolve,
-            $manifest->ocean_tile_path(), rtrim($data_dir, '/') . '/tiles');
+            $manifest->ocean_tile_path(), rtrim($data_dir, '/') . '/tiles',
+            $manifest->tile_format());
         return ['ok' => true, 'tiles' => $counts['tiles'], 'ocean' => $counts['ocean']];
     }
 }
