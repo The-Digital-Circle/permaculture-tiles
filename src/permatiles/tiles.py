@@ -65,8 +65,9 @@ def render_tile(z, x, y, geodata, textures, palette, pad, size, opts=None):
 
 def render_zoom(z, geodata, textures, palette, out_dir, pad, size, workers=1, bbox_tiles=None,
                 opts=None):
-    """Render every tile at zoom z, write the PNG tree under out_dir/z/x/y.png, skip pruned tiles.
-    bbox_tiles, if given, restricts to (x0,y0,x1,y1) inclusive."""
+    """Render every tile at zoom z, write the tile tree under out_dir/z/x/y.{ext}, skip pruned tiles.
+    The extension follows opts['tile_format'] (png or webp). bbox_tiles, if given, restricts to
+    (x0,y0,x1,y1) inclusive."""
     n = geo.num_tiles(z)
     x0, y0, x1, y1 = bbox_tiles or (0, 0, n - 1, n - 1)
     written = pruned = 0
