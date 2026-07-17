@@ -100,7 +100,7 @@ add_action('template_redirect', function () {
 });
 
 register_activation_hook(__FILE__, function () {
-    add_rewrite_rule('^permatiles/(\d+)/(\d+)/(\d+)\.png$',
+    add_rewrite_rule('^permatiles/(\d+)/(\d+)/(\d+)\.(?:png|webp)$',
         'index.php?permatiles_z=$matches[1]&permatiles_x=$matches[2]&permatiles_y=$matches[3]', 'top');
     flush_rewrite_rules();
 });
