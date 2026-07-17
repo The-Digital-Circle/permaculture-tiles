@@ -5,7 +5,7 @@ from . import data, tiles, pack
 from .palette import Palette
 from .textures import fractal_noise, brush_density, paper_grain
 from .prune import shared_ocean_tile
-from .quantise import to_png8
+from .quantise import encode, ext_for
 
 def load_config(path: str) -> dict:
     with open(path, "rb") as f:
@@ -58,20 +58,28 @@ def cmd_render(cfg: dict):
         else:
             print(tiles.render_zoom(z, gd, tex, pal, cfg["out_dir"], cfg["pad"], cfg["tile_size"],
                                     opts=opts))
-    with open(os.path.join(cfg["out_dir"], "ocean.png"), "wb") as f:
-        f.write(to_png8(shared_ocean_tile(pal, tex, cfg["pad"], cfg["tile_size"], opts=opts)))
+    fmt = opts.get("tile_format", "png")
+    quality = int(opts.get("webp_quality", 90))
+    with open(os.path.join(cfg["out_dir"], f"ocean.{ext_for(fmt)}"), "wb") as f:
+        f.write(encode(shared_ocean_tile(pal, tex, cfg["pad"], cfg["tile_size"], opts=opts),
+                       fmt, quality))
 
 def cmd_pack(cfg: dict):
     out = cfg["out_dir"]
+    opts = render_opts(cfg)
+    fmt = opts.get("tile_format", "png")
+    ext = ext_for(fmt)
     sizes = {z: pack.measure_zoom_bytes(out, z) for z in range(cfg["zoom_min"], cfg["zoom_max"] + 1)}
     sizes = {z: b for z, b in sizes.items() if b > 0}
     bands = pack.plan_bands(sizes, cfg["pmtiles_cap"])
     files = []
     for b in bands:
         name = f"tiles-z{b['zmin']}-{b['zmax']}.pmtiles"
-        pack.pack_band(out, os.path.join(out, name), b["zmin"], b["zmax"], cfg["attribution"])
+        pack.pack_band(out, os.path.join(out, name), b["zmin"], b["zmax"], cfg["attribution"],
+                       ext=ext, tile_format=fmt)
         files.append({"file": name, "zmin": b["zmin"], "zmax": b["zmax"]})
-    m = pack.write_manifest(out, files, "ocean.png", cfg["tile_size"], cfg["zoom_max"], cfg["attribution"])
+    m = pack.write_manifest(out, files, f"ocean.{ext}", cfg["tile_size"], cfg["zoom_max"],
+                            cfg["attribution"], tile_format=fmt)
     print(f"packed {len(files)} band(s): {[f['file'] for f in files]}")
     return m
 

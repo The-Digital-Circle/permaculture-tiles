@@ -4,6 +4,8 @@ import hashlib
 from pmtiles.writer import Writer
 from pmtiles.tile import TileType, Compression, zxy_to_tileid
 
+_TILE_TYPES = {"png": TileType.PNG, "webp": TileType.WEBP}
+
 MERC_LAT_E7 = 850511287
 LON_E7 = 1800000000
 
@@ -31,8 +33,9 @@ def plan_bands(sizes: dict, cap: int):
         bands.append({"zmin": cur[0], "zmax": cur[-1]})
     return bands
 
-def _entries(tree_dir, zmin, zmax):
+def _entries(tree_dir, zmin, zmax, ext="png"):
     out = []
+    suffix = "." + ext
     for z in range(zmin, zmax + 1):
         zdir = os.path.join(tree_dir, str(z))
         if not os.path.isdir(zdir):
@@ -40,15 +43,16 @@ def _entries(tree_dir, zmin, zmax):
         for xs in os.listdir(zdir):
             xdir = os.path.join(zdir, xs)
             for ys in os.listdir(xdir):
-                if not ys.endswith(".png"):
+                stem, e = os.path.splitext(ys)      # NOT ys[:-4]: ".webp" is 5 chars, not 4
+                if e != suffix:
                     continue
-                x, y = int(xs), int(ys[:-4])
+                x, y = int(xs), int(stem)
                 out.append((zxy_to_tileid(z, x, y), z, os.path.join(xdir, ys)))
     out.sort()                       # pmtiles requires ascending tile id
     return out
 
-def pack_band(tree_dir, out_path, zmin, zmax, attribution):
-    entries = _entries(tree_dir, zmin, zmax)
+def pack_band(tree_dir, out_path, zmin, zmax, attribution, ext="png", tile_format="png"):
+    entries = _entries(tree_dir, zmin, zmax, ext)
     zs = [z for _, z, _ in entries] or [zmin]
     with open(out_path, "wb") as f:
         w = Writer(f)
@@ -57,7 +61,7 @@ def pack_band(tree_dir, out_path, zmin, zmax, attribution):
                 w.write_tile(tid, tf.read())
         w.finalize(
             {
-                "tile_type": TileType.PNG,
+                "tile_type": _TILE_TYPES[tile_format],
                 "tile_compression": Compression.NONE,
                 "min_zoom": min(zs),
                 "max_zoom": max(zs),
@@ -76,7 +80,7 @@ def _sha256(path):
             h.update(chunk)
     return h.hexdigest()
 
-def write_manifest(out_dir, files, ocean_tile, tile_size, maxzoom, attribution):
+def write_manifest(out_dir, files, ocean_tile, tile_size, maxzoom, attribution, tile_format="png"):
     tiles = []
     for fdesc in files:
         path = os.path.join(out_dir, fdesc["file"])
@@ -89,7 +93,7 @@ def write_manifest(out_dir, files, ocean_tile, tile_size, maxzoom, attribution):
             "sha256": _sha256(path),
         })
     manifest = {"tiles": tiles, "ocean_tile": ocean_tile, "tile_size": tile_size,
-                "maxzoom": maxzoom, "attribution": attribution}
+                "maxzoom": maxzoom, "attribution": attribution, "tile_format": tile_format}
     with open(os.path.join(out_dir, "manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=2)
     return manifest
